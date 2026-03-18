@@ -34,7 +34,7 @@ repo-root/
 
 - `main`: 리뷰 후 병합되는 기본 브랜치
 - `feature/aws-network`: 인프라 1 네트워크 작업
-- `feature/aws-platform`: 인프라 2 플랫폼 작업
+- `feature/aws-compute`: 인프라 2 플랫폼 작업
 - `feature/aws-data`: 인프라 3 데이터 계층 작업
 - `feature/aws-dashboard-cicd`: 인프라 4 배포 및 CI/CD 작업
 
