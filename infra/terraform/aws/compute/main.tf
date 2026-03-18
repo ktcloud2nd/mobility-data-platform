@@ -1,19 +1,28 @@
-# 1. 인프라 2에서 사용할 추가 변수 (이미 variables.tf에 있다면 생략 가능)
+# 1. 인프라 1(Network)의 정보를 가져오는 통로 설정
+data "terraform_remote_state" "network" {
+  backend = "local"
+
+  config = {
+    path = "../network/terraform.tfstate"
+  }
+}
+
+# 2. 사용할 변수 정의
 variable "instance_key_name" {
   description = "EC2에 접속하기 위한 기존 AWS 키페어 이름"
   type        = string
   default     = "8team-key" 
 }
 
-# 2. Bastion Host (Public 영역)
+# 3. Bastion Host (Remote State 참조)
 resource "aws_instance" "bastion" {
-  ami           = "ami-0c02fb55956c7d316" # Ubuntu 24.04 LTS (ap-northeast-2)
+  ami           = "ami-0c02fb55956c7d316"
   instance_type = "t3.micro"
   key_name      = var.instance_key_name
 
-  # 첫 번째 공용 서브넷에 배치
-  subnet_id              = aws_subnet.public[0].id
-  vpc_security_group_ids = [aws_security_group.bastion.id]
+  # network의 output인 public_subnet_ids 리스트 중 첫 번째 값 사용
+  subnet_id              = data.terraform_remote_state.network.outputs.public_subnet_ids[0]
+  vpc_security_group_ids = [data.terraform_remote_state.network.outputs.security_group_ids.bastion]
 
   tags = {
     Name = "${var.name_prefix}-bastion"
@@ -21,17 +30,16 @@ resource "aws_instance" "bastion" {
   }
 }
 
-# 3. K3s Master Node (Private App 영역)
+# 4. K3s Master Node (Remote State 참조)
 resource "aws_instance" "k3s_master" {
   ami           = "ami-0c02fb55956c7d316"
-  instance_type = "t3.medium" # K3s + Linkerd 권장 사양
+  instance_type = "t3.medium"
   key_name      = var.instance_key_name
 
-  # 첫 번째 프라이빗 앱 서브넷에 배치
-  subnet_id              = aws_subnet.private_app[0].id
-  vpc_security_group_ids = [aws_security_group.k3s_nodes.id]
+  # network의 output인 private_app_subnet_ids 리스트 중 첫 번째 값 사용
+  subnet_id              = data.terraform_remote_state.network.outputs.private_app_subnet_ids[0]
+  vpc_security_group_ids = [data.terraform_remote_state.network.outputs.security_group_ids.k3s_nodes]
 
-  # Ansible 연동을 위한 기본 설정
   user_data = <<-EOF
               #!/bin/bash
               sudo apt-get update
@@ -44,7 +52,7 @@ resource "aws_instance" "k3s_master" {
   }
 }
 
-# 4. K3s Worker Nodes (ASG 활용)
+# 5. K3s Worker Nodes (Launch Template & ASG)
 resource "aws_launch_template" "k3s_worker_lt" {
   name_prefix   = "${var.name_prefix}-k3s-worker-lt-"
   image_id      = "ami-0c02fb55956c7d316"
@@ -53,7 +61,7 @@ resource "aws_launch_template" "k3s_worker_lt" {
 
   network_interfaces {
     associate_public_ip_address = false
-    security_groups             = [aws_security_group.k3s_nodes.id]
+    security_groups             = [data.terraform_remote_state.network.outputs.security_group_ids.k3s_nodes]
   }
 
   user_data = base64encode(<<-EOF
@@ -77,8 +85,9 @@ resource "aws_autoscaling_group" "k3s_worker_asg" {
   desired_capacity    = 2
   max_size            = 3
   min_size            = 1
-  # 모든 프라이빗 앱 서브넷(2개 AZ)에 걸쳐 생성
-  vpc_zone_identifier = aws_subnet.private_app[*].id
+  
+  # network의 모든 프라이빗 앱 서브넷 리스트 참조
+  vpc_zone_identifier = data.terraform_remote_state.network.outputs.private_app_subnet_ids
 
   launch_template {
     id      = aws_launch_template.k3s_worker_lt.id
