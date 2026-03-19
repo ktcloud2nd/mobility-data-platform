@@ -1,3 +1,4 @@
+#차량상태 테이블
 CREATE TABLE vehicle_stats (
     vehicle_id VARCHAR(50) PRIMARY KEY,
     driver_code VARCHAR(50),
@@ -8,7 +9,7 @@ CREATE TABLE vehicle_stats (
     engine_on BOOLEAN,
     fuel NUMERIC(5,2)
 );
-
+#이상 탐지 테이블
 CREATE TABLE recent_alert (
     alert_id SERIAL PRIMARY KEY,
     vehicle_id VARCHAR(50),
@@ -17,7 +18,7 @@ CREATE TABLE recent_alert (
     alert_type VARCHAR(50),
     message TEXT
 );
-
+#사용자-차량 연결 테이블
 CREATE TABLE user_vehicle_mapping (
     driver_code VARCHAR(50),
     vehicle_id VARCHAR(50),

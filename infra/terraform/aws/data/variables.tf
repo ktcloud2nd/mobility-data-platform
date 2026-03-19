@@ -53,7 +53,7 @@ variable "allocated_storage" {
 variable "storage_type" {
   description = "Storage type for RDS."
   type        = string
-  default     = "gp2"
+  default     = "gp3"
 }
 
 variable "backup_retention_period" {
