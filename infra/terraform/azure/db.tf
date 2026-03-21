@@ -12,9 +12,9 @@ resource "azurerm_private_dns_zone_virtual_network_link" "db_dns_link" {
   resource_group_name   = azurerm_resource_group.rg.name
 }
 
-# PostgreSQL Flexible Server (싱글 노드 구성)
-resource "azurerm_postgresql_flexible_server" "postgres_db" {
-  name                   = "palja-bootcamp-pg-server"
+# PostgreSQL Flexible Server 생성
+resource "azurerm_postgresql_flexible_server" "pg_db" {
+  name                   = "palja-pg-server"
   resource_group_name    = azurerm_resource_group.rg.name
   location               = azurerm_resource_group.rg.location
   version                = "14"
@@ -22,15 +22,21 @@ resource "azurerm_postgresql_flexible_server" "postgres_db" {
   delegated_subnet_id    = azurerm_subnet.db_subnet.id 
   private_dns_zone_id    = azurerm_private_dns_zone.db_dns_zone.id
   
-  administrator_login    = "admin"
+  administrator_login    = "dbadmin"
   administrator_password = var.db_password
   
   storage_mb             = 32768
   sku_name               = "B_Standard_B1ms"
 
-  # 백업 보존 기간
   backup_retention_days  = 7 
 
-  # DNS 세팅이 완료된 후 DB가 만들어지도록 순서 보장
   depends_on = [azurerm_private_dns_zone_virtual_network_link.db_dns_link]
+}
+
+# DB 생성
+resource "azurerm_postgresql_flexible_server_database" "raw_db" {
+  name      = "raw_db"
+  server_id = azurerm_postgresql_flexible_server.pg_db.id
+  collation = "en_US.utf8"
+  charset   = "utf8"
 }
