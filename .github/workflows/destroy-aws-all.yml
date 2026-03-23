@@ -12,9 +12,12 @@ concurrency:
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
-  TF_VERSION: '1.8.5'
-  # 기존코드+수정됨: local state path 변수 제거, S3 backend 기준으로 동작
+  TF_VERSION: "1.8.5"
+  # existing code + modified: local state path removed for S3 backend
   # TF_VAR_network_state_path: ../network/terraform.tfstate
+  # existing code + modified: remote_state reads use tfstate account creds
+  TF_VAR_network_state_access_key: ${{ secrets.AWS_TFSTATE_S3_ACCESS_KEY }}
+  TF_VAR_network_state_secret_key: ${{ secrets.AWS_TFSTATE_S3_SECRET_ACCESS_KEY }}
 
 jobs:
   destroy-all:
@@ -28,6 +31,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
+          # existing code + modified: provider credentials stay on infra account
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
@@ -50,31 +54,37 @@ jobs:
         run: |
           cp terraform.tfvars.example terraform.tfvars
 
-      # COMPUTE DESTROY
       - name: Compute Init
         working-directory: infra/aws/terraform/compute
-        # 기존코드+수정됨: S3 backend 재초기화를 위해 -reconfigure 추가
-        run: terraform init -input=false -reconfigure
+        # existing code + modified: backend init uses tfstate account creds
+        run: >-
+          terraform init -input=false -reconfigure
+          -backend-config="access_key=${{ secrets.AWS_TFSTATE_S3_ACCESS_KEY }}"
+          -backend-config="secret_key=${{ secrets.AWS_TFSTATE_S3_SECRET_ACCESS_KEY }}"
 
       - name: Compute Destroy
         working-directory: infra/aws/terraform/compute
         run: terraform destroy -input=false -auto-approve
 
-      # DATA DESTROY
       - name: Data Init
         working-directory: infra/aws/terraform/data
-        # 기존코드+수정됨: S3 backend 재초기화를 위해 -reconfigure 추가
-        run: terraform init -input=false -reconfigure
+        # existing code + modified: backend init uses tfstate account creds
+        run: >-
+          terraform init -input=false -reconfigure
+          -backend-config="access_key=${{ secrets.AWS_TFSTATE_S3_ACCESS_KEY }}"
+          -backend-config="secret_key=${{ secrets.AWS_TFSTATE_S3_SECRET_ACCESS_KEY }}"
 
       - name: Data Destroy
         working-directory: infra/aws/terraform/data
         run: terraform destroy -input=false -auto-approve
 
-      # NETWORK DESTROY
       - name: Network Init
         working-directory: infra/aws/terraform/network
-        # 기존코드+수정됨: S3 backend 재초기화를 위해 -reconfigure 추가
-        run: terraform init -input=false -reconfigure
+        # existing code + modified: backend init uses tfstate account creds
+        run: >-
+          terraform init -input=false -reconfigure
+          -backend-config="access_key=${{ secrets.AWS_TFSTATE_S3_ACCESS_KEY }}"
+          -backend-config="secret_key=${{ secrets.AWS_TFSTATE_S3_SECRET_ACCESS_KEY }}"
 
       - name: Network Destroy
         working-directory: infra/aws/terraform/network
