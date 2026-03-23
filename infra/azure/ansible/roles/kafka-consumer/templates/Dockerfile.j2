@@ -1,21 +1,24 @@
+# 베이스 이미지 (RedHat UBI 기반)
 FROM confluentinc/cp-kafka-connect:7.5.0
 
+# 루트 권한으로 패키지 설치
 USER root
-ENV DEBIAN_FRONTEND=noninteractive
 
-# 패키지 설치 및 불필요한 파일 삭제 (정석)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends unzip && \
-    rm -rf /var/lib/apt/lists/*
+# RedHat 계열은 apt-get 대신 microdnf 또는 yum을 사용
+RUN microdnf update && \
+    microdnf install -y unzip && \
+    microdnf clean all
 
-# 플러그인 설치 경로 미리 생성 및 권한 부여 (실무 팁)
+# 플러그인 디렉토리 권한 설정
 RUN mkdir -p /usr/share/confluent-hub-components && \
     chown -R appuser:appuser /usr/share/confluent-hub-components
 
-# 설치는 다시 일반 사용자로 진행 (보안 및 파일 소유권 일치)
+# 다시 일반 사용자로 전환
 USER appuser
 
+# 필수 커넥터 설치
 RUN confluent-hub install --no-prompt confluentinc/kafka-connect-azure-blob-storage:2.5.3 && \
     confluent-hub install --no-prompt confluentinc/kafka-connect-s3:10.5.0
 
+# 실행 명령
 CMD ["/etc/confluent/docker/run"]
