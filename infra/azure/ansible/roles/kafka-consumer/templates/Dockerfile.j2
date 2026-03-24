@@ -3,33 +3,30 @@ FROM confluentinc/cp-kafka-connect:7.5.0
 USER root
 RUN microdnf update && microdnf install -y unzip && microdnf clean all
 
-# ZIP 파일 복사
+# 1. ZIP 파일 복사
 COPY azure-part1.zip azure-part2.zip s3.zip /tmp/
 
-# 플러그인 루트 폴더 생성
-RUN mkdir -p /usr/share/confluent-hub-components/azure-blob/lib && \
-    mkdir -p /usr/share/confluent-hub-components/s3/lib
+# 2. [핵심 변경] 플러그인 전용 폴더가 아니라 엔진 공용 폴더(/usr/share/java/kafka/)에 직접 해제
+# 이렇게 하면 엔진이 켜질 때 "어? 이건 내 원래 부품이네?" 하고 아무 의심 없이 로드합니다.
+RUN unzip -o -j /tmp/azure-part1.zip "*/lib/*.jar" -d /usr/share/java/kafka/ && \
+    unzip -o -j /tmp/azure-part2.zip "*/lib/*.jar" -d /usr/share/java/kafka/ && \
+    unzip -o -j /tmp/s3.zip "*/lib/*.jar" -d /usr/share/java/kafka/
 
-# 1. 압축 해제 (기존 로직 유지, -o 옵션으로 덮어쓰기 안전성 확보)
-RUN unzip -o -j /tmp/azure-part1.zip "*/lib/*.jar" -d /usr/share/confluent-hub-components/azure-blob/lib/ && \
-    unzip -o -j /tmp/azure-part2.zip "*/lib/*.jar" -d /usr/share/confluent-hub-components/azure-blob/lib/ && \
+# 3. 형식상 플러그인 경로에 manifest만 둡니다 (엔진이 찾기는 해야 하니까요)
+RUN mkdir -p /usr/share/confluent-hub-components/azure-blob && \
+    mkdir -p /usr/share/confluent-hub-components/s3 && \
     unzip -o -j /tmp/azure-part1.zip "*/manifest.json" -d /usr/share/confluent-hub-components/azure-blob/ && \
-    unzip -o -j /tmp/s3.zip "*/lib/*.jar" -d /usr/share/confluent-hub-components/s3/lib/ && \
     unzip -o -j /tmp/s3.zip "*/manifest.json" -d /usr/share/confluent-hub-components/s3/
 
-# 2. [★핵심 수정] 엔진(7.5.0)이 가진 Protobuf 관련 핵심 부품을 Azure 폴더에 강제로 넣어줍니다.
-# 이 한 줄이 "NoClassDefFoundError: ProtoSerde"를 잡는 치트키입니다.
-RUN cp /usr/share/java/kafka-serde-tools/kafka-protobuf-serializer-7.5.0.jar /usr/share/confluent-hub-components/azure-blob/lib/ && \
-    cp /usr/share/java/kafka-serde-tools/kafka-schema-serializer-7.5.0.jar /usr/share/confluent-hub-components/azure-blob/lib/
-
-# 3. 권한 부여 (반드시 소유권을 appuser로 넘겨야 엔진이 파일을 읽습니다)
-RUN chown -R appuser:appuser /usr/share/confluent-hub-components && \
-    chmod -R 755 /usr/share/confluent-hub-components && \
+# 4. 권한 부여 및 정리 (엔진 심장부 폴더까지 소유권 변경)
+RUN chown -R appuser:appuser /usr/share/java/kafka /usr/share/confluent-hub-components && \
+    chmod -R 755 /usr/share/java/kafka && \
     rm /tmp/*.zip
 
 USER appuser
 
-# plugin.path 설정 유지
+# 5. [치트키] 자바 엔진이 시동 걸 때 이 폴더의 모든 JAR를 무조건 읽도록 강제합니다.
+ENV CLASSPATH="/usr/share/java/kafka/*"
 ENV CONNECT_PLUGIN_PATH="/usr/share/java,/usr/share/confluent-hub-components"
 
 CMD ["/etc/confluent/docker/run"]
