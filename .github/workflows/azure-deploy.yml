@@ -35,10 +35,10 @@ jobs:
       - name: Prepare Plugins
         run: |
           mkdir -p ./plugins
-          curl -L -o azure.zip https://client.hub.confluent.io/plugins/confluentinc/kafka-connect-azure-blob-storage/2.5.3.zip
-          curl -L -o s3.zip https://client.hub.confluent.io/plugins/confluentinc/kafka-connect-s3/10.5.0.zip
-          unzip azure.zip -d ./plugins
-          unzip s3.zip -d ./plugins
+          curl -L -O https://api.hub.confluent.io/api/plugins/confluentinc/kafka-connect-azure-blob-storage/versions/2.5.3/archive
+          curl -L -O https://api.hub.confluent.io/api/plugins/confluentinc/kafka-connect-s3/versions/10.5.0/archive
+          unzip archive -d ./plugins/azure-blob || unzip archive.1 -d ./plugins/azure-blob
+          unzip archive.1 -d ./plugins/s3 || unzip archive -d ./plugins/s3
           cp -r ./plugins ./infra/azure/ansible/roles/kafka-consumer/templates/
 
       - name: Login to Docker Hub
