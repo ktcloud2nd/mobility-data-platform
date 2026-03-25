@@ -21,6 +21,7 @@ env:
 
   # variables.tf로 밀어 넣을 비밀 정보
   TF_VAR_public_key: ${{ secrets.AZURE_PUBLIC_KEY }}
+  TF_VAR_onprem_ip: ${{ secrets.ONPREM_SOURCE_IP }}
 
 jobs:
   build-image:

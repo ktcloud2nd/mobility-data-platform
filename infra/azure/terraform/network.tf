@@ -67,7 +67,7 @@ resource "azurerm_network_security_group" "broker_nsg" {
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
-    source_address_prefix      = "*"
+    source_address_prefix      = "${var.onprem_ip}/32" # 온프레미스 공인 IP (32비트 전체 고정)
     destination_port_ranges    = ["9094", "9095", "9096"]
     source_port_range          = "*"
     destination_address_prefix = "*"
@@ -79,7 +79,7 @@ resource "azurerm_network_security_group" "broker_nsg" {
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
-    source_address_prefix      = "*" # 임시 개방
+    source_address_prefix      = "*" # 임시 개방 (관리자 IP + GitHub Runner IP)
     destination_port_range     = "22"
     source_port_range          = "*"
     destination_address_prefix = "*"
