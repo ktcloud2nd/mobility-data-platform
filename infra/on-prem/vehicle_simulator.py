@@ -101,13 +101,13 @@ def simulate_vehicle(vehicle):
                 vehicle["fuel"] = max(0, vehicle["fuel"] - random.uniform(0.1, 0.5))
                 vehicle["lat"] += random.uniform(-0.001, 0.001) * (vehicle["speed"] / 50)
                 vehicle["lon"] += random.uniform(-0.001, 0.001) * (vehicle["speed"] / 50)
-                mode, event_type, interval = 1, 1, random.randint(2, 5)
+                mode, event_type, interval = 1, 1, 1.0 # 1초 주기
             else: # 시동 ON, 정차 중 (Stopped)
                 vehicle["speed"] = 0
-                mode, event_type, interval = 2, 1, random.randint(5, 20)
+                mode, event_type, interval = 2, 1, 5.0 # 5초 주기
         else: # 시동 OFF (Off)
             vehicle["speed"] = 0
-            mode, event_type, interval = 3, 2, random.randint(30, 60)
+            mode, event_type, interval = 3, 2, 30.0 # 30초 주기 (heartbeat)
 
         # 좌표 제한 및 전송
         vehicle["lat"] = round(clamp(vehicle["lat"], 30.0, 45.0), 6)
