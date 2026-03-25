@@ -32,3 +32,8 @@ variable "admin_name" {
   type        = string
   default     = "palja"
 }
+
+variable "onprem_ip" {
+  description = "온프레미스(차량 시뮬레이터) 공인 IP"
+  type        = string
+}
