@@ -107,7 +107,7 @@ def simulate_vehicle(vehicle):
                 mode, event_type, interval = 2, 1, 5.0 # 5초 주기
         else: # 시동 OFF (Off)
             vehicle["speed"] = 0
-            mode, event_type, interval = 3, 2, 30.0 # 30초 주기 (heartbeat)
+            mode, event_type, interval = 3, 2, 30.0 # 30초 주기 (Heartbeat)
 
         # 좌표 제한 및 전송
         vehicle["lat"] = round(clamp(vehicle["lat"], 30.0, 45.0), 6)
