@@ -1,0 +1,105 @@
+---
+- name: Linkerd CLI 최신 stable 버전 조회
+  uri:
+    url: https://api.github.com/repos/linkerd/linkerd2/releases/latest
+    return_content: yes
+  register: linkerd_release
+  run_once: true
+
+- name: Linkerd CLI 버전 변수 설정
+  set_fact:
+    linkerd_version: "{{ linkerd_release.json.tag_name }}"
+  run_once: true
+
+- name: Linkerd CLI 바이너리 다운로드
+  get_url:
+    url: "https://github.com/linkerd/linkerd2/releases/download/{{ linkerd_version }}/linkerd2-cli-{{ linkerd_version }}-linux-amd64"
+    dest: /usr/local/bin/linkerd
+    mode: '0755'
+  run_once: true
+
+- name: Linkerd 네임스페이스 존재 여부 확인
+  command: kubectl get namespace linkerd
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
+  register: linkerd_ns_check
+  failed_when: false
+  changed_when: false
+
+- name: Linkerd 사전 점검 (pre-check)
+  command: linkerd check --pre
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
+  register: linkerd_precheck
+  failed_when: linkerd_precheck.rc != 0
+  when: linkerd_ns_check.rc != 0
+
+- name: Linkerd CRD 설치
+  shell: linkerd install --crds | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
+  when: linkerd_ns_check.rc != 0
+
+- name: Linkerd 컨트롤 플레인 설치
+  shell: linkerd install | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
+  when: linkerd_ns_check.rc != 0
+
+- name: Linkerd 컨트롤 플레인 준비 완료 대기 (최대 5분)
+  command: linkerd check
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
+  register: linkerd_check
+  until: linkerd_check.rc == 0
+  retries: 10
+  delay: 30
+
+- name: Linkerd Viz extension 설치
+  shell: linkerd viz install | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
+
+- name: Linkerd Viz 준비 완료 대기 (최대 5분)
+  command: linkerd viz check
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
+  register: linkerd_viz_check
+  until: linkerd_viz_check.rc == 0
+  retries: 10
+  delay: 30
+
+- name: user-app 네임스페이스 생성 및 Linkerd 주입 활성화
+  shell: |
+    kubectl apply -f - <<EOF
+    apiVersion: v1
+    kind: Namespace
+    metadata:
+      name: user-app
+      annotations:
+        linkerd.io/inject: enabled
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
+
+- name: operator-app 네임스페이스 생성 및 Linkerd 주입 활성화
+  shell: |
+    kubectl apply -f - <<EOF
+    apiVersion: v1
+    kind: Namespace
+    metadata:
+      name: operator-app
+      annotations:
+        linkerd.io/inject: enabled
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
