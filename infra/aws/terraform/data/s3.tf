@@ -1,10 +1,10 @@
 # ---------- ktcloud2nd-dev-data ----------
 
 resource "aws_s3_bucket" "data" {
-  bucket = "${var.name_prefix}-data"
+  bucket        = "${var.name_prefix}-data"
   force_destroy = true # 버킷 강제 삭제 (destroy용), 실무에서는 절대 안씀
 
-  tags = merge(var.tags, {
+  tags   = merge(var.tags, {
     Name = "${var.name_prefix}-data"
   })
 }
@@ -58,10 +58,10 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "data" {
 # ---------- ktcloud2nd-dev-images ----------
 
 resource "aws_s3_bucket" "images" {
-  bucket = "${var.name_prefix}-images"
+  bucket        = "${var.name_prefix}-images"
   force_destroy = true
 
-  tags = merge(var.tags, {
+  tags   = merge(var.tags, {
     Name = "${var.name_prefix}-images"
   })
 }
