@@ -1,0 +1,58 @@
+---
+- name: prometheus Helm repo 추가
+  command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
+
+- name: Helm repo 업데이트
+  command: helm repo update
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
+
+- name: kube-prometheus-stack 설치 여부 확인
+  command: helm status kube-prometheus-stack --namespace operator-app
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
+  register: prometheus_status
+  failed_when: false
+  changed_when: false
+
+- name: kube-prometheus-stack Helm 배포
+  command: >
+    helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack
+    --namespace operator-app
+    --set grafana.adminPassword={{ vault_grafana_admin_password }}
+    --set grafana.tolerations[0].key=nodetype
+    --set grafana.tolerations[0].operator=Equal
+    --set grafana.tolerations[0].value=operator
+    --set grafana.tolerations[0].effect=NoSchedule
+    --set grafana.nodeSelector.role=operator-worker
+    --set prometheus.prometheusSpec.tolerations[0].key=nodetype
+    --set prometheus.prometheusSpec.tolerations[0].operator=Equal
+    --set prometheus.prometheusSpec.tolerations[0].value=operator
+    --set prometheus.prometheusSpec.tolerations[0].effect=NoSchedule
+    --set prometheus.prometheusSpec.nodeSelector.role=operator-worker
+    --set alertmanager.alertmanagerSpec.tolerations[0].key=nodetype
+    --set alertmanager.alertmanagerSpec.tolerations[0].operator=Equal
+    --set alertmanager.alertmanagerSpec.tolerations[0].value=operator
+    --set alertmanager.alertmanagerSpec.tolerations[0].effect=NoSchedule
+    --set alertmanager.alertmanagerSpec.nodeSelector.role=operator-worker
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
+  when: prometheus_status.rc != 0
+
+- name: Grafana 파드 준비 완료 대기
+  command: kubectl rollout status deployment/kube-prometheus-stack-grafana --namespace operator-app --timeout=300s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
+
+- name: Prometheus 파드 준비 완료 대기
+  command: kubectl rollout status statefulset/prometheus-kube-prometheus-stack-prometheus --namespace operator-app --timeout=300s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
