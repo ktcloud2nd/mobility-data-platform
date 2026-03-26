@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: import-job-config
+  namespace: operator-app
+data:
+  AWS_REGION: ap-northeast-2
+  S3_BUCKET: ktcloud2nd-dev-data
+  RDS_PORT: "5432"
+  RDS_DB: vehicle_db
+  RDS_USER: dbadmin
+  POLL_INTERVAL_SECONDS: "5"
+  TELEMETRY_RETENTION_SECONDS: "3600"
