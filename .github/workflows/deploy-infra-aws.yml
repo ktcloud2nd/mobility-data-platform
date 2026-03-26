@@ -350,7 +350,7 @@ jobs:
         run: ansible-playbook -i inventory/hosts.ini --vault-password-file vault/vault_pass playbooks/setup_k3s_cluster.yml
 
   deploy-k8s-secrets:
-    name: K8s Secret 배포
+    name: K8s 배포
     runs-on: ubuntu-latest
     needs: ansible-k3s-setup
     if: ${{ inputs.action == 'apply' }}

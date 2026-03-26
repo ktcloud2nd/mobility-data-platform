@@ -24,6 +24,7 @@
   command: >
     helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack
     --namespace operator-app
+    --timeout 15m
     --set grafana.adminPassword={{ vault_grafana_admin_password }}
     --set grafana.tolerations[0].key=nodetype
     --set grafana.tolerations[0].operator=Equal
