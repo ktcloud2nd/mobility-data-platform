@@ -17,9 +17,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "data" {
     id     = "delete-old-data"
     status = "Enabled"
 
-    filter {
-      # prefix = "processed/" # ???
-    }
+    filter {}
 
     expiration {
       days = 7 # 7일 뒤 자동 삭제
@@ -97,6 +95,9 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "images" {
 # 버킷 정책 (외부 접근 허용)
 resource "aws_s3_bucket_policy" "images_public_read" {
   bucket = aws_s3_bucket.images.id
+
+  # 퍼블릭 액세스 차단 해제 후 정책 실행
+  depends_on = [aws_s3_bucket_public_access_block.images]
 
   policy = jsonencode({
     Version = "2012-10-17"
