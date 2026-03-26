@@ -68,7 +68,7 @@ def lambda_handler(event, context):
         # 안하면, 람다는 단순 S3 to RDS 파이프라인으로 사용됩니다.
 
         # 윈도우 슬라이딩 (2분 지난 데이터 삭제)
-        cur.execute("DELETE FROM vehicle_telemetry_history WHERE occurred_at < NOW() - INTERVAL '120 second';")
+        cur.execute("DELETE FROM vehicle_history WHERE occurred_at < NOW() - INTERVAL '120 second';")
 
         conn.commit()
         print(f"Successfully processed {len(raw_data)} records from {key}")
