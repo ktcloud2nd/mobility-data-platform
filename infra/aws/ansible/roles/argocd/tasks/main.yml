@@ -11,14 +11,24 @@
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   run_once: true
 
-- name: ArgoCD 설치 여부 확인
-  command: helm status argocd --namespace argocd
+- name: ArgoCD 릴리즈 상태 확인
+  shell: >
+    helm status argocd --namespace argocd --output json 2>/dev/null
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['info']['status'])"
+    2>/dev/null || echo "not-found"
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   run_once: true
-  register: argocd_status
+  register: argocd_release_status
   failed_when: false
   changed_when: false
+
+- name: 실패한 ArgoCD 릴리즈 제거 (재설치 위해)
+  command: helm uninstall argocd --namespace argocd
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
+  when: argocd_release_status.stdout == "failed"
 
 - name: ArgoCD Helm 배포
   command: >
@@ -46,10 +56,20 @@
     --set controller.tolerations[0].value=operator
     --set controller.tolerations[0].effect=NoSchedule
     --set controller.nodeSelector.role=operator-worker
+    --set redis.tolerations[0].key=nodetype
+    --set redis.tolerations[0].operator=Equal
+    --set redis.tolerations[0].value=operator
+    --set redis.tolerations[0].effect=NoSchedule
+    --set redis.nodeSelector.role=operator-worker
+    --set dex.tolerations[0].key=nodetype
+    --set dex.tolerations[0].operator=Equal
+    --set dex.tolerations[0].value=operator
+    --set dex.tolerations[0].effect=NoSchedule
+    --set dex.nodeSelector.role=operator-worker
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   run_once: true
-  when: argocd_status.rc != 0
+  when: argocd_release_status.stdout != "deployed"
 
 - name: ArgoCD 서버 준비 완료 대기
   command: kubectl rollout status deployment/argocd-server --namespace argocd --timeout=300s
@@ -80,6 +100,8 @@
         automated:
           prune: true
           selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
     EOF
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
@@ -108,6 +130,8 @@
         automated:
           prune: true
           selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
     EOF
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml

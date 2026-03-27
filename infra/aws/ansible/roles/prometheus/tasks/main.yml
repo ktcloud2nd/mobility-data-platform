@@ -42,6 +42,8 @@
     --namespace operator-app
     --create-namespace
     --timeout 15m
+    --set prometheusOperator.admissionWebhooks.enabled=false
+    --set prometheusOperator.admissionWebhooks.patch.enabled=false
     --set grafana.adminPassword={{ vault_grafana_admin_password }}
     --set grafana.tolerations[0].key=nodetype
     --set grafana.tolerations[0].operator=Equal
