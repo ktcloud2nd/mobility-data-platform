@@ -358,7 +358,7 @@ jobs:
     name: Ansible Playbook
     runs-on: ubuntu-latest
     needs: prepare-ansible-inventory
-    if: ${{ contains(fromJSON('["apply","ansible"]'), inputs.action) }}
+    if: ${{ always() && contains(fromJSON('["apply","ansible"]'), inputs.action) && needs.prepare-ansible-inventory.result == 'success' }}
 
     steps:
       - name: Checkout repository
