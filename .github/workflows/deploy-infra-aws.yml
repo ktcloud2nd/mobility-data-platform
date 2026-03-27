@@ -246,7 +246,11 @@ jobs:
 
       - name: Data Destroy
         working-directory: ${{ github.workspace }}/infra/aws/terraform/data
-        run: terraform destroy -input=false -auto-approve
+        run: |
+          terraform destroy -input=false -auto-approve \
+            -target=aws_db_instance.postgresql \
+            -target=aws_db_subnet_group.postgresql \
+            -target=aws_route53_record.db_endpoint
 
       - name: Network Init
         working-directory: ${{ github.workspace }}/infra/aws/terraform/network
@@ -257,7 +261,24 @@ jobs:
 
       - name: Network Destroy
         working-directory: ${{ github.workspace }}/infra/aws/terraform/network
-        run: terraform destroy -input=false -auto-approve
+        run: |
+          # VPC 본체를 제외한 나머지 삭제 (Route 53랑 VPC가 연결되어 있음)
+          terraform destroy -input=false -auto-approve \
+            -target=aws_security_group.db \
+            -target=aws_security_group.k3s_nodes \
+            -target=aws_security_group.alb \
+            -target=aws_nat_gateway.this \
+            -target=aws_eip.nat \
+            -target=aws_lb.public \
+            -target=aws_lb_target_group.worker_http \
+            -target=aws_internet_gateway.this \
+            -target=aws_subnet.public \
+            -target=aws_subnet.private_app \
+            -target=aws_subnet.private_db \
+            -target=aws_route_table.public \
+            -target=aws_route_table.private_app \
+            -target=aws_route_table.private_db \
+            -target=aws_vpc_endpoint.s3
 
   prepare-ansible-inventory:
     name: Prepare Ansible Inventory

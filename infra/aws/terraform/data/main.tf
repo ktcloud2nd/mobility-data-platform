@@ -73,20 +73,17 @@ resource "aws_db_instance" "postgresql" {
   })
 }
 
-# Route 53 프라이빗 호스팅 영역 (삭제 방지 설정)
+# Route 53 프라이빗 호스팅 영역 (삭제하면 안됨)
 resource "aws_route53_zone" "private" {
   name = "vehicle.internal" # 우리가 지정한 도메인 이름
   vpc {
     vpc_id = data.aws_vpc.selected.id
   }
-  lifecycle {
-    prevent_destroy = true # 700원 아끼기 위해 테라폼 destroy 시에도 남겨둠
-  }
 
   tags = var.tags
 }
 
-# RDS 고정 주소 레코드 (CNAME)
+# RDS 고정 주소 레코드 (CNAME) (삭제해도 됨)
 resource "aws_route53_record" "db_endpoint" {
   zone_id = aws_route53_zone.private.zone_id
   name    = "db.vehicle.internal" # 앤서블에서 사용할 고정 주소
