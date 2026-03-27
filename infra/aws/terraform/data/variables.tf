@@ -1,7 +1,7 @@
 variable "name_prefix" {
   description = "Prefix used for AWS resource names."
   type        = string
-  default     = "ktcloud2nd-dev"
+  default     = "ktcloud2nd"
 }
 
 variable "aws_region" {
