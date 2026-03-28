@@ -195,6 +195,9 @@ jobs:
     name: Terraform Destroy
     runs-on: ubuntu-latest
     if: ${{ inputs.action == 'destroy' }}
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout repository
@@ -211,31 +214,19 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
 
       - name: Prepare compute tfvars from example
         working-directory: ${{ github.workspace }}/infra/aws/terraform/compute
-        shell: bash
         run: |
           cp terraform.tfvars.example terraform.tfvars
           sed -i 's|^k3s_shared_token *=.*|k3s_shared_token = "${{ secrets.K3S_TOKEN }}"|' terraform.tfvars
 
       - name: Prepare data tfvars from example
         working-directory: ${{ github.workspace }}/infra/aws/terraform/data
-        shell: bash
         run: |
           cp terraform.tfvars.example terraform.tfvars
           sed -i 's|^db_password *=.*|db_password = "${{ secrets.RDS_PASSWORD }}"|' terraform.tfvars
-
-      - name: Compute Init
-        working-directory: ${{ github.workspace }}/infra/aws/terraform/compute
-        run: >-
-          terraform init -input=false -reconfigure
-          -backend-config="access_key=${{ secrets.AWS_TFSTATE_S3_ACCESS_KEY }}"
-          -backend-config="secret_key=${{ secrets.AWS_TFSTATE_S3_SECRET_ACCESS_KEY }}"
-
-      - name: Compute Destroy
-        working-directory: ${{ github.workspace }}/infra/aws/terraform/compute
-        run: terraform destroy -input=false -auto-approve
 
       - name: Data Init
         working-directory: ${{ github.workspace }}/infra/aws/terraform/data
@@ -244,13 +235,33 @@ jobs:
           -backend-config="access_key=${{ secrets.AWS_TFSTATE_S3_ACCESS_KEY }}"
           -backend-config="secret_key=${{ secrets.AWS_TFSTATE_S3_SECRET_ACCESS_KEY }}"
 
+      - name: Data Refresh State
+        working-directory: ${{ github.workspace }}/infra/aws/terraform/data
+        continue-on-error: true
+        run: |
+          # Refresh-only is safer than targeted destroy because it removes already deleted
+          # AWS resources from state first, then full destroy handles the remaining graph.
+          terraform apply -refresh-only -auto-approve -input=false
+
       - name: Data Destroy
         working-directory: ${{ github.workspace }}/infra/aws/terraform/data
-        run: |
-          terraform destroy -input=false -auto-approve \
-            -target=aws_db_instance.postgresql \
-            -target=aws_db_subnet_group.postgresql \
-            -target=aws_route53_record.db_endpoint
+        run: terraform destroy -auto-approve -input=false
+
+      - name: Compute Init
+        working-directory: ${{ github.workspace }}/infra/aws/terraform/compute
+        run: >-
+          terraform init -input=false -reconfigure
+          -backend-config="access_key=${{ secrets.AWS_TFSTATE_S3_ACCESS_KEY }}"
+          -backend-config="secret_key=${{ secrets.AWS_TFSTATE_S3_SECRET_ACCESS_KEY }}"
+
+      - name: Compute Refresh State
+        working-directory: ${{ github.workspace }}/infra/aws/terraform/compute
+        continue-on-error: true
+        run: terraform apply -refresh-only -auto-approve -input=false
+
+      - name: Compute Destroy
+        working-directory: ${{ github.workspace }}/infra/aws/terraform/compute
+        run: terraform destroy -auto-approve -input=false
 
       - name: Network Init
         working-directory: ${{ github.workspace }}/infra/aws/terraform/network
@@ -259,26 +270,14 @@ jobs:
           -backend-config="access_key=${{ secrets.AWS_TFSTATE_S3_ACCESS_KEY }}"
           -backend-config="secret_key=${{ secrets.AWS_TFSTATE_S3_SECRET_ACCESS_KEY }}"
 
+      - name: Network Refresh State
+        working-directory: ${{ github.workspace }}/infra/aws/terraform/network
+        continue-on-error: true
+        run: terraform apply -refresh-only -auto-approve -input=false
+
       - name: Network Destroy
         working-directory: ${{ github.workspace }}/infra/aws/terraform/network
-        run: |
-          # VPC 본체를 제외한 나머지 삭제 (Route 53랑 VPC가 연결되어 있음)
-          terraform destroy -input=false -auto-approve \
-            -target=aws_security_group.db \
-            -target=aws_security_group.k3s_nodes \
-            -target=aws_security_group.alb \
-            -target=aws_nat_gateway.this \
-            -target=aws_eip.nat \
-            -target=aws_lb.public \
-            -target=aws_lb_target_group.worker_http \
-            -target=aws_internet_gateway.this \
-            -target=aws_subnet.public \
-            -target=aws_subnet.private_app \
-            -target=aws_subnet.private_db \
-            -target=aws_route_table.public \
-            -target=aws_route_table.private_app \
-            -target=aws_route_table.private_db \
-            -target=aws_vpc_endpoint.s3
+        run: terraform destroy -auto-approve -input=false
 
   prepare-ansible-inventory:
     name: Prepare Ansible Inventory
