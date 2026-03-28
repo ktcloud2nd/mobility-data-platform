@@ -25,11 +25,17 @@ resource "azurerm_storage_account" "raw_storage" {
     environment = "dev"
     purpose     = "raw-data-lake"
   }
-  
+
     # 서브넷이 완전히 준비될 때까지 기다리도록 강제
   depends_on = [
     azurerm_subnet.consumer_subnet
   ]
+}
+
+# 권한 생성을 위한 60초 대기
+resource "time_sleep" "wait_60_seconds" {
+  depends_on = [azurerm_role_assignment.storage_data_contributor]
+  create_duration = "60s"
 }
 
 # 데이터를 담을 Data Lake Gen2 전용 파일 시스템(컨테이너) 생성
@@ -37,9 +43,9 @@ resource "azurerm_storage_data_lake_gen2_filesystem" "raw_filesystem" {
   name                  = "raw-topic-container"
   storage_account_id    = azurerm_storage_account.raw_storage.id
  
-  # 권한이 먼저 부여된 후에 컨테이너를 만들도록 순서 강제
+  # 60초 대기가 끝난 후에 실행
   depends_on = [
-    azurerm_role_assignment.storage_data_contributor
+    time_sleep.wait_60_seconds
   ]
 }
 
