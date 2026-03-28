@@ -9,9 +9,7 @@ variable "vm_size" {
   type        = string
   
   # 2 Cores / 8GB Memory
-  # 테스트: Standard_B2ms (Cost-efficient)
-  # 데모: Standard_D2s_v3 (Better Kafka performance)
-  default     = "Standard_B2ms"
+  default     = "Standard_D2s_v3"
 }
 
 variable "vm_image" {
@@ -23,6 +21,13 @@ variable "vm_image" {
     sku       = "22_04-lts-gen2"
     version   = "latest"
   }
+}
+
+# GitHub Actions 접속을 위해 임시 개방
+variable "storage_network_action" {
+  description = "Storage Network Default Action (Allow/Deny)"
+  type        = string
+  default     = "Allow" # Azure 배포 완료되면 'Deny'로 변경 후 재배포 (외부 접근 차단)
 }
 
 # Github Secrets를 통해 배포될 때 주입

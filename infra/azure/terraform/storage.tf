@@ -16,7 +16,7 @@ resource "azurerm_storage_account" "raw_storage" {
   is_hns_enabled           = true
 
   network_rules {
-    default_action             = "Deny" # 기본적으로 외부 인터넷 접속 모두 차단
+    default_action             = var.storage_network_action
     virtual_network_subnet_ids = [azurerm_subnet.consumer_subnet.id] # 오직 컨슈머 서브넷만 허용
     ip_rules                   = ["218.39.98.40"] # 사용자 공인 IP (Data Lake 업그레이드 후 요구)
   }
@@ -32,20 +32,14 @@ resource "azurerm_storage_account" "raw_storage" {
   ]
 }
 
-# 권한 생성을 위한 60초 대기
-resource "time_sleep" "wait_60_seconds" {
-  depends_on = [azurerm_role_assignment.storage_data_contributor]
-  create_duration = "60s"
-}
-
 # 데이터를 담을 Data Lake Gen2 전용 파일 시스템(컨테이너) 생성
 resource "azurerm_storage_data_lake_gen2_filesystem" "raw_filesystem" {
   name                  = "raw-topic-container"
   storage_account_id    = azurerm_storage_account.raw_storage.id
  
-  # 60초 대기가 끝난 후에 실행
+  # 권한 부여가 끝나면 실행
   depends_on = [
-    time_sleep.wait_60_seconds
+    azurerm_role_assignment.storage_data_contributor
   ]
 }
 
