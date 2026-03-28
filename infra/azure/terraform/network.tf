@@ -100,6 +100,18 @@ resource "azurerm_network_security_group" "consumer_nsg" {
   resource_group_name = azurerm_resource_group.rg.name
 
   security_rule {
+  name                       = "allow-ssh-from-vnet"
+  priority                   = 90 # 우선순위 높임
+  direction                  = "Inbound"
+  access                     = "Allow"
+  protocol                   = "Tcp"
+  source_address_prefix      = "10.0.0.0/16" # VNet 내부 통신 허용
+  destination_port_range     = "22"
+  source_port_range          = "*"
+  destination_address_prefix = "*"
+}
+  
+  security_rule {
     name                       = "allow-ssh"
     priority                   = 100
     direction                  = "Inbound"
@@ -125,6 +137,25 @@ resource "azurerm_network_security_group" "consumer_nsg" {
   }
 }
 
+# Bastion NSG 생성
+resource "azurerm_network_security_group" "bastion_nsg" {
+  name                = "bastion-nsg"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
+  security_rule {
+    name                       = "allow-ssh-from-external"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_address_prefix      = "*" # GitHub Actions IP용
+    destination_port_range     = "22"
+    source_port_range          = "*"
+    destination_address_prefix = "*"
+  }
+}
+
 # NSG 연결
 resource "azurerm_subnet_network_security_group_association" "broker_assoc" {
   subnet_id                 = azurerm_subnet.broker_subnet.id
@@ -134,4 +165,9 @@ resource "azurerm_subnet_network_security_group_association" "broker_assoc" {
 resource "azurerm_subnet_network_security_group_association" "consumer_assoc" {
   subnet_id                 = azurerm_subnet.consumer_subnet.id
   network_security_group_id = azurerm_network_security_group.consumer_nsg.id
+}
+
+resource "azurerm_subnet_network_security_group_association" "bastion_assoc" {
+  subnet_id                 = azurerm_subnet.bastion_subnet.id
+  network_security_group_id = azurerm_network_security_group.bastion_nsg.id
 }
