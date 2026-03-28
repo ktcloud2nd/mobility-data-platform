@@ -64,7 +64,7 @@
         rotate.interval.ms: "60000"  # 1분마다 강제 저장
         
         # Data Lake의 폴더 기능 활용
-        file.name.template: "{{topic}}/{{timestamp:unit=yyyy}}/{{timestamp:unit=MM}}/{{timestamp:unit=dd}}/{{partition}}-{{start_offset}}.json"
+        file.name.template: !unsafe "{{topic}}/{{timestamp:unit=yyyy}}/{{timestamp:unit=MM}}/{{timestamp:unit=dd}}/{{partition}}-{{start_offset}}.json"
         timestamp.extractor: "Wallclock" # 현재 시간을 기준으로 폴더 생성
     status_code: [201, 409]
   register: connect_result
