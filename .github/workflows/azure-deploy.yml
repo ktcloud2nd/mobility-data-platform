@@ -60,8 +60,9 @@ jobs:
     name: 'Terraform Azure'
     needs: build-image # 빌드가 성공해야 배포 시작
     if: |
-      github.event.inputs.action == 'destroy' || 
-      (github.event.inputs.action == 'apply' && success())
+      always() &&
+      (github.event.inputs.action == 'destroy' || 
+      (github.event.inputs.action == 'apply' && needs.build-image.result == 'success'))
     runs-on: ubuntu-latest
 
     defaults:
@@ -71,6 +72,15 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
+
+    # AWS 인증 정보 설정 (SSM에서 비번을 읽어오기 위해 반드시 필요)
+    # S3 Backand 읽어야 함
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ vars.AWS_REGION }}
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
@@ -83,6 +93,12 @@ jobs:
     - name: Terraform Apply
       if: ${{ github.event.inputs.action == 'apply' }}
       run: terraform apply -auto-approve
+
+    - name: Terraform Destroy
+      if: ${{ github.event.inputs.action == 'destroy' }}
+      run: terraform destroy -auto-approve
+
+    # ----- Apply 성공 시 실행되는 후속 작업들 -----
 
     # 스토리지 정보 추출 (jq 사용)
     - name: Get Storage Info from Terraform
@@ -110,18 +126,22 @@ jobs:
     - name: Generate Ansible Inventory
       if: ${{ github.event.inputs.action == 'apply' }}
       run: |
+        BASTION_IP=$(terraform output -json bastion_public_ip | jq -r .)
         BROKER_IP=$(terraform output -json broker_public_ip | jq -r .)
-        CONSUMER_IP=$(terraform output -json consumer_public_ip | jq -r .)
+        CONSUMER_PRIV_IP=$(terraform output -json consumer_private_ip | jq -r .)
         VM_USER=$(terraform output -json admin_username | jq -r .)
 
-        echo "Checking IPs: Broker($BROKER_IP), Consumer($CONSUMER_IP)"
+        echo "Generating inventory with Bastion($BASTION_IP), Broker($BROKER_IP), Consumer($CONSUMER_PRIV_IP)"
 
         cat <<EOF > azure_hosts.ini
+        [bastion]
+        bastion-host ansible_host=${BASTION_IP}
+
         [azure_broker]
         broker-vm ansible_host=${BROKER_IP}
 
         [azure_consumer]
-        consumer-vm ansible_host=${CONSUMER_IP}
+        consumer-vm ansible_host=${CONSUMER_PRIV_IP}
 
         [azure_vms:children]
         azure_broker
@@ -131,16 +151,10 @@ jobs:
         ansible_user=${VM_USER}
         ansible_ssh_private_key_file=~/.ssh/id_rsa
         ansible_ssh_common_args='-o StrictHostKeyChecking=no'
-        EOF
 
-    # AWS 인증 정보 설정 (SSM에서 비번을 읽어오기 위해 반드시 필요)
-    - name: Configure AWS credentials
-      if: ${{ github.event.inputs.action == 'apply' }}
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ vars.AWS_REGION }}
+        [azure_consumer:vars]
+        ansible_ssh_common_args='-o StrictHostKeyChecking=no -o ProxyCommand="ssh -W %h:%p -q ${VM_USER}@${BASTION_IP} -o StrictHostKeyChecking=no"'
+        EOF
 
     # AWS와 통신하기 위한 필수 라이브러리 설치 (앤서블 전용 환경에 주입)
     - name: Install dependencies for Ansible AWS lookup
@@ -168,7 +182,14 @@ jobs:
           -e "rds_endpoint=db.vehicle.internal" \
           -e "db_name=vehicle_db" \
           -e "db_user=dbadmin"
-
-    - name: Terraform Destroy
-      if: ${{ github.event.inputs.action == 'destroy' }}
-      run: terraform destroy -auto-approve
+    
+    # Azure NAT IP를 AWS 보안 그룹에 반영하기 위해 AWS 배포를 자동 호출
+    # 기본 토큰은 권한이 부족하므로 별도 생성한 PAT(MY_GITHUB_TOKEN) 사용
+    - name: Trigger AWS SG Update
+      if: success() && github.event.inputs.action == 'apply'
+      run: |
+        curl -X POST \
+          -H "Authorization: token ${{ secrets.MY_GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/${{ github.repository }}/actions/workflows/aws-deploy.yml/dispatches \
+          -d '{"ref":"main", "inputs": {"action": "apply"}}'

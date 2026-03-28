@@ -1,11 +1,13 @@
-name: deploy-infra-aws
+name: 'AWS Infrastructure Deploy'
+# 배포 순서: AWS(하류) → Azure(상류) → AWS(자동 재호출)
 
 on:
   workflow_dispatch:
     inputs:
       action:
-        description: "Select the job to run."
+        description: '실행할 작업을 선택하세요.'
         required: true
+        default: 'apply'
         type: choice
         options:
           - apply
@@ -195,6 +197,9 @@ jobs:
     name: Terraform Destroy
     runs-on: ubuntu-latest
     if: ${{ inputs.action == 'destroy' }}
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout repository
@@ -211,6 +216,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
 
       - name: Prepare compute tfvars from example
         working-directory: ${{ github.workspace }}/infra/aws/terraform/compute
@@ -226,23 +232,18 @@ jobs:
           cp terraform.tfvars.example terraform.tfvars
           sed -i 's|^db_password *=.*|db_password = "${{ secrets.RDS_PASSWORD }}"|' terraform.tfvars
 
-      - name: Compute Init
-        working-directory: ${{ github.workspace }}/infra/aws/terraform/compute
-        run: >-
-          terraform init -input=false -reconfigure
-          -backend-config="access_key=${{ secrets.AWS_TFSTATE_S3_ACCESS_KEY }}"
-          -backend-config="secret_key=${{ secrets.AWS_TFSTATE_S3_SECRET_ACCESS_KEY }}"
-
-      - name: Compute Destroy
-        working-directory: ${{ github.workspace }}/infra/aws/terraform/compute
-        run: terraform destroy -input=false -auto-approve
-
       - name: Data Init
         working-directory: ${{ github.workspace }}/infra/aws/terraform/data
         run: >-
           terraform init -input=false -reconfigure
           -backend-config="access_key=${{ secrets.AWS_TFSTATE_S3_ACCESS_KEY }}"
           -backend-config="secret_key=${{ secrets.AWS_TFSTATE_S3_SECRET_ACCESS_KEY }}"
+
+      - name: Data Refresh State
+        working-directory: ${{ github.workspace }}/infra/aws/terraform/data
+        continue-on-error: true
+        run: |
+          terraform apply -refresh-only -auto-approve -input=false
 
       - name: Data Destroy
         working-directory: ${{ github.workspace }}/infra/aws/terraform/data
@@ -251,6 +252,22 @@ jobs:
             -target=aws_db_instance.postgresql \
             -target=aws_db_subnet_group.postgresql \
             -target=aws_route53_record.db_endpoint
+      
+      - name: Compute Init
+        working-directory: ${{ github.workspace }}/infra/aws/terraform/compute
+        run: >-
+          terraform init -input=false -reconfigure
+          -backend-config="access_key=${{ secrets.AWS_TFSTATE_S3_ACCESS_KEY }}"
+          -backend-config="secret_key=${{ secrets.AWS_TFSTATE_S3_SECRET_ACCESS_KEY }}"
+
+      - name: Compute Refresh State
+        working-directory: ${{ github.workspace }}/infra/aws/terraform/compute
+        continue-on-error: true
+        run: terraform apply -refresh-only -auto-approve -input=false
+
+      - name: Compute Destroy
+        working-directory: ${{ github.workspace }}/infra/aws/terraform/compute
+        run: terraform destroy -input=false -auto-approve
 
       - name: Network Init
         working-directory: ${{ github.workspace }}/infra/aws/terraform/network
@@ -258,6 +275,11 @@ jobs:
           terraform init -input=false -reconfigure
           -backend-config="access_key=${{ secrets.AWS_TFSTATE_S3_ACCESS_KEY }}"
           -backend-config="secret_key=${{ secrets.AWS_TFSTATE_S3_SECRET_ACCESS_KEY }}"
+
+      - name: Network Refresh State
+        working-directory: ${{ github.workspace }}/infra/aws/terraform/network
+        continue-on-error: true
+        run: terraform apply -refresh-only -auto-approve -input=false
 
       - name: Network Destroy
         working-directory: ${{ github.workspace }}/infra/aws/terraform/network

@@ -10,9 +10,15 @@ resource "azurerm_storage_account" "raw_storage" {
   resource_group_name      = azurerm_resource_group.rg.name
   location                 = azurerm_resource_group.rg.location
   account_tier             = "Standard"
-  
-  # 비용 최적화: LRS (Locally Redundant Storage)
-  account_replication_type = "LRS"
+  account_replication_type = "LRS" # 비용 최적화: LRS (Locally Redundant Storage)
+
+  # 일반 스토리지를 Data Lake Gen2로 변경
+  is_hns_enabled           = true
+
+  network_rules {
+    default_action             = "Deny" # 기본적으로 외부 인터넷 접속 모두 차단
+    virtual_network_subnet_ids = [azurerm_subnet.consumer_subnet.id] # 오직 컨슈머 서브넷만 허용
+  }
 
   tags = {
     environment = "dev"
@@ -20,11 +26,8 @@ resource "azurerm_storage_account" "raw_storage" {
   }
 }
 
-# 스토리지 계정 안에 데이터를 담을 컨테이너(버킷) 생성
-resource "azurerm_storage_container" "raw_container" {
+# 데이터를 담을 Data Lake Gen2 전용 파일 시스템(컨테이너) 생성
+resource "azurerm_storage_data_lake_gen2_filesystem" "raw_filesystem" {
   name                  = "raw-topic-container"
   storage_account_id    = azurerm_storage_account.raw_storage.id
-  
-  # 외부 인터넷에서 URL 쳐서 들어오는 거 원천 차단 (Private)
-  container_access_type = "private" 
 }

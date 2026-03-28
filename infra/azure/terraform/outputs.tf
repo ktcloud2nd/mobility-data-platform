@@ -8,9 +8,19 @@ output "broker_private_ip" {
   value       = azurerm_network_interface.broker_nic.private_ip_address
 }
 
-output "consumer_public_ip" {
-  description = "Consumer VM에 직접 접속하기 위한 공인 IP 주소"
-  value       = azurerm_public_ip.consumer_public_ip.ip_address
+#output "consumer_public_ip" {
+#  description = "Consumer VM에 직접 접속하기 위한 공인 IP 주소"
+#  value       = azurerm_public_ip.consumer_public_ip.ip_address
+#}
+
+output "consumer_private_ip" {
+  description = "Bastion을 통해 접속할 Consumer VM의 내부 IP 주소"
+  value       = azurerm_network_interface.consumer_nic.private_ip_address
+}
+
+output "bastion_public_ip" {
+  description = "Bastion Host의 공인 IP (Ansible 징검다리용)"
+  value       = azurerm_public_ip.bastion_public_ip.ip_address
 }
 
 output "consumer_nat_public_ip" {

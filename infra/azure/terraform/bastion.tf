@@ -1,38 +1,38 @@
-# Broker Public IP 생성
-resource "azurerm_public_ip" "broker_public_ip" {
-  name                = "broker-public-ip"
+# Bastion Public IP 생성
+resource "azurerm_public_ip" "bastion_public_ip" {
+  name                = "bastion-public-ip"
   location            = var.region
   resource_group_name = azurerm_resource_group.rg.name
   allocation_method   = "Static"
-  sku                 = "Standard" # Standard SKU Public IP는 무조건 Static 방식만 지원
+  sku                 = "Standard"
   zones               = ["1"]
 }
 
-# Broker NIC 생성
-resource "azurerm_network_interface" "broker_nic" {
-  name                = "broker-nic"
+# Bastion NIC 생성
+resource "azurerm_network_interface" "bastion_nic" {
+  name                = "bastion-nic"
   location            = var.region
   resource_group_name = azurerm_resource_group.rg.name
 
   ip_configuration {
-    name                          = "internal"
-    subnet_id                     = azurerm_subnet.broker_subnet.id
+    name                          = "external"
+    subnet_id                     = azurerm_subnet.bastion_subnet.id 
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.broker_public_ip.id
+    public_ip_address_id          = azurerm_public_ip.bastion_public_ip.id
   }
 }
 
-# Broker VM 인스턴스 생성
-resource "azurerm_linux_virtual_machine" "broker_vm" {
-  name                = "broker-vm"
+# Bastion VM 인스턴스 생성
+resource "azurerm_linux_virtual_machine" "bastion_vm" {
+  name                = "bastion-vm"
   resource_group_name = azurerm_resource_group.rg.name
   location            = var.region
-  size                = var.vm_size
+  size                = "Standard_B2ts_v2" # 2 Cores / 1GB Memory
   zone                = "1"
   admin_username      = var.admin_name
 
   network_interface_ids = [
-    azurerm_network_interface.broker_nic.id
+    azurerm_network_interface.bastion_nic.id
   ]
 
   admin_ssh_key {
@@ -42,7 +42,7 @@ resource "azurerm_linux_virtual_machine" "broker_vm" {
 
   os_disk {
     caching              = "ReadWrite"
-    storage_account_type = "StandardSSD_LRS"
+    storage_account_type = "Standard_LRS" # 제일 저렴한 HDD/SSD
   }
 
   source_image_reference {

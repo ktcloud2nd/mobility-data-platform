@@ -2,8 +2,8 @@ terraform {
   required_version = ">= 1.6.0"
 
   backend "s3" {
-    bucket  = "8team-terraform-tfstate"
-    key     = "data/terraform.tfstate"
+    bucket  = "palja-terraform-backend"
+    key     = "compute/terraform.tfstate"
     region  = "ap-northeast-2"
     encrypt = true
   }
@@ -12,6 +12,10 @@ terraform {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
+    }
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.5"
     }
   }
 }

@@ -1,9 +1,9 @@
+# AWS S3에 Azure tfstate 저장 (tfstate 금고를 AWS로 통일)
 terraform {
-  backend "azurerm" {
-    resource_group_name  = "palja-tfstate-rg"
-    storage_account_name = "paljatfstate1234"
-    container_name       = "tfstate"
-    key                  = "terraform.tfstate"
+  backend "s3" {
+    bucket         = "palja-terraform-backend"
+    key            = "azure/terraform.tfstate"
+    region         = "ap-northeast-2"
   }
 }
 

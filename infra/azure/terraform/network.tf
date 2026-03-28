@@ -25,8 +25,15 @@ resource "azurerm_subnet" "consumer_subnet" {
   service_endpoints    = ["Microsoft.Storage"]
 }
 
-# NAT Gateway
-# Consumer Public IP 생성 (NAT Gateway에 붙음)
+# Bastion Subnet 생성
+resource "azurerm_subnet" "bastion_subnet" {
+  name                 = "bastion-subnet"
+  address_prefixes     = ["10.0.3.0/24"]
+  resource_group_name  = azurerm_resource_group.rg.name
+  virtual_network_name = azurerm_virtual_network.vnet.name
+}
+
+# NAT Gateway용 Public IP 생성 (NAT Gateway에 붙음)
 resource "azurerm_public_ip" "consumer_nat_ip" {
   name                = "consumer-nat-ip"
   location            = azurerm_resource_group.rg.location

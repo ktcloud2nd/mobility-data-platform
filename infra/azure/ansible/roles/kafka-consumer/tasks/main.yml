@@ -41,14 +41,15 @@
     db_password: "{{ lookup('amazon.aws.aws_ssm', '/config/vehicle/db_password', region='ap-northeast-2') }}"
 
 # 원본 저장용
-- name: "Azure Blob Storage Sink 커넥터 설정 (Raw Data)"
+- name: "Azure Data Lake (ADLS Gen2) Sink 커넥터 설정 (Raw Data)"
   uri:
     url: "http://localhost:8083/connectors"
     method: POST
     body_format: json
     body:
-      name: "azure-blob-raw-sink"
+      name: "azure-datalake-raw-sink"
       config:
+        # Azure Data Lake Gen2는 기본적으로 Blob Storage의 뼈대 위에 폴더 기능을 얹은 것이기 때문에, 통신할 때는 기존의 Blob API 클래스를 그대로 사용해서 통신
         connector.class: "io.aiven.kafka.connect.azure.sink.AzureBlobSinkConnector"
         tasks.max: "1"
         topics: "raw_topic"
@@ -61,6 +62,10 @@
         format.output.type: "json"
         flush.size: "100" # 파티션이 3개이기 때문에 메시지가 약 300개가 날아와야 파일이 생성됨
         rotate.interval.ms: "60000"  # 1분마다 강제 저장
+        
+        # Data Lake의 폴더 기능 활용
+        file.name.template: "{{topic}}/{{timestamp:unit=yyyy}}/{{timestamp:unit=MM}}/{{timestamp:unit=dd}}/{{partition}}-{{start_offset}}.json"
+        timestamp.extractor: "Wallclock" # 현재 시간을 기준으로 폴더 생성
     status_code: [201, 409]
   register: connect_result
   until: "connect_result.status is defined and (connect_result.status == 201 or connect_result.status == 409)"

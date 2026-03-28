@@ -1,24 +1,24 @@
 # Consumer Public IP 생성
-resource "azurerm_public_ip" "consumer_public_ip" {
-  name                = "consumer-public-ip"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-  allocation_method   = "Static"
-  sku                 = "Standard" # NAT Gateway와 호환되려면 Standard여야 함
-}
+#resource "azurerm_public_ip" "consumer_public_ip" {
+#  name                = "consumer-public-ip"
+#  location            = azurerm_resource_group.rg.location
+#  resource_group_name = azurerm_resource_group.rg.name
+#  allocation_method   = "Static"
+#  sku                 = "Standard" # NAT Gateway와 호환되려면 Standard여야 함
+#}
 
 # Consumer NIC 생성
 resource "azurerm_network_interface" "consumer_nic" {
   name                = "consumer-nic"
-  location            = azurerm_resource_group.rg.location
+  location            = var.region
   resource_group_name = azurerm_resource_group.rg.name
 
   ip_configuration {
     name                          = "internal"
     subnet_id                     = azurerm_subnet.consumer_subnet.id
     private_ip_address_allocation = "Static"
-    private_ip_address            = "10.0.2.4"
-    public_ip_address_id          = azurerm_public_ip.consumer_public_ip.id
+    private_ip_address            = "10.0.2.4" # Azure 예약 IP(.0~.3)를 피해서 .4부터 사용
+    #public_ip_address_id          = azurerm_public_ip.consumer_public_ip.id
   }
 }
 
