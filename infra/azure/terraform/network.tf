@@ -101,7 +101,7 @@ resource "azurerm_network_security_group" "consumer_nsg" {
 
   security_rule {
   name                       = "allow-ssh-from-vnet"
-  priority                   = 90 # 우선순위 높임
+  priority                   = 100 # 우선순위 높임
   direction                  = "Inbound"
   access                     = "Allow"
   protocol                   = "Tcp"
@@ -113,7 +113,7 @@ resource "azurerm_network_security_group" "consumer_nsg" {
   
   security_rule {
     name                       = "allow-ssh"
-    priority                   = 100
+    priority                   = 110
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
@@ -126,7 +126,7 @@ resource "azurerm_network_security_group" "consumer_nsg" {
 	# Kafka Connect API용
   security_rule {
     name                       = "allow-kafka-connect-api"
-    priority                   = 110
+    priority                   = 120
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
