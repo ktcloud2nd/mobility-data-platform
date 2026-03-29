@@ -33,6 +33,29 @@
     creates: /usr/local/bin/helm
   run_once: true
 
+- name: Traefik ping 엔드포인트 활성화 (ALB 헬스체크 대응)
+  shell: |
+    kubectl apply -f - <<EOF
+    apiVersion: helm.cattle.io/v1
+    kind: HelmChartConfig
+    metadata:
+      name: traefik
+      namespace: kube-system
+    spec:
+      valuesContent: |-
+        ping:
+          entryPoint: "web"
+    EOF
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
+
+- name: Traefik 재시작 대기
+  command: kubectl rollout status deployment/traefik -n kube-system --timeout=120s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  run_once: true
+
 - name: autoscaler Helm repo 추가
   command: helm repo add autoscaler https://kubernetes.github.io/autoscaler --force-update
   environment:
