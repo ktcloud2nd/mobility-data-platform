@@ -12,6 +12,7 @@ export default function App() {
   return (
     <BrowserRouter basename="/operator">
       <Routes>
+        <Route index element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={
           <PrivateRoute><Dashboard /></PrivateRoute>
