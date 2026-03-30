@@ -5,7 +5,7 @@ output "db_instance_identifier" {
 
 output "db_endpoint" {
   description = "RDS endpoint address."
-  value       = "db.vehicle.internal"
+  value       = aws_db_instance.ktcloud2nd_postgres.address
 }
 
 output "db_port" {
