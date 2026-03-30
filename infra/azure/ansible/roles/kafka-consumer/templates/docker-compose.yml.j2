@@ -36,19 +36,12 @@ services:
       CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
       
+      # 들어오는 키값은 반드시 {"key": "value"} 형태의 JSON이어야 함
       CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
       CONNECT_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
       CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
-      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "true"
       
       CONNECT_PLUGIN_PATH: "/usr/share/confluent-hub-components"
-
-    # S3 미사용으로 임시 주석 처리 (삭제 예정)
-    # S3 커넥터는 Confluent 허브에서 정석대로 설치
-    #command: 
-    #  - bash
-    #  - -c
-    #  - |
-    #    confluent-hub install --no-prompt confluentinc/kafka-connect-s3:latest
-    #    /etc/confluent/docker/run
+    
     restart: always

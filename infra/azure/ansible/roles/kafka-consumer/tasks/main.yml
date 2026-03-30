@@ -1,3 +1,17 @@
+# AWS RDS 주소(Endpoint)를 실시간으로 조회
+- name: AWS RDS 정보 가져오기 (동적 주소 조회)
+  amazon.aws.rds_instance_info:
+    db_instance_identifier: "ktcloud2nd-postgres"
+    region: "ap-northeast-2"
+  delegate_to: localhost # 조희는 GitHub Runner(로컬)에서 수행
+  register: rds_info
+
+# 조회된 주소와 SSM의 비밀번호를 변수로 할당
+- name: 엔드포인트 및 비밀번호 변수 설정
+  set_fact:
+    rds_endpoint: "{{ rds_info.instances[0].endpoint.address }}"
+    db_password: "{{ lookup('amazon.aws.aws_ssm', '/config/vehicle/db_password', region='ap-northeast-2') }}"
+
 - name: Consumer 작업용 루트(앱) 디렉토리 생성
   file:
     path: "/home/{{ ansible_user }}/consumer-app/app"
@@ -36,10 +50,6 @@
     seconds: 30
     prompt: "Consumer 앱과 Connector가 완전히 뜰 때까지 기다립니다."
 
-- name: AWS SSM에서 DB 비밀번호 가져오기
-  set_fact:
-    db_password: "{{ lookup('amazon.aws.aws_ssm', '/config/vehicle/db_password', region='ap-northeast-2') }}"
-
 # 원본 저장용
 - name: "Azure Data Lake (ADLS Gen2) Sink 커넥터 설정 (Raw Data)"
   uri:
@@ -53,9 +63,10 @@
         connector.class: "io.aiven.kafka.connect.azure.sink.AzureBlobSinkConnector"
         tasks.max: "1"
         topics: "raw_topic"
-        key.converter: "org.apache.kafka.connect.storage.StringConverter"
+        key.converter: "org.apache.kafka.connect.json.JsonConverter"
+        key.converter.schemas.enable: "false" 
         value.converter: "org.apache.kafka.connect.json.JsonConverter"
-        value.converter.schemas.enable: "false"
+        value.converter.schemas.enable: "true"
         azure.storage.connection.string: "DefaultEndpointsProtocol=https;AccountName={{ azure_storage_account_name }};AccountKey={{ azure_storage_primary_key }};EndpointSuffix=core.windows.net"
         azure.storage.container.name: "raw-topic-container"
         format.output.fields: "value"
@@ -90,9 +101,11 @@
         insert.mode: "insert"
         auto.create: "false"
         value.converter: "org.apache.kafka.connect.json.JsonConverter"
-        value.converter.schemas.enable: "false"
-        batch.size: "50" # 3개의 파티션이니까 약 150개의 데이터가 보내져야 확인 가능 (오버헤드 예방, 실시간성 1~2초 지연)
-        linger.ms: "2000" # 2초마다 강제 INSERT (사용자는 거의 실시간으로 느낌)
+        value.converter.schemas.enable: "true"
+        key.converter: "org.apache.kafka.connect.json.JsonConverter" # 추가
+        key.converter.schemas.enable: "false"
+        batch.size: "1" # 3개의 파티션이니까 약 150개의 데이터가 보내져야 확인 가능 (오버헤드 예방, 실시간성 1~2초 지연)
+        #linger.ms: "2000" # 2초마다 강제 INSERT (사용자는 거의 실시간으로 느낌)
     status_code: [201, 409]
   register: rds_stats_result
   until: "rds_stats_result.status is defined and (rds_stats_result.status == 201 or rds_stats_result.status == 409)"
@@ -117,7 +130,9 @@
         insert.mode: "insert"
         auto.create: "false"
         value.converter: "org.apache.kafka.connect.json.JsonConverter"
-        value.converter.schemas.enable: "false"
+        value.converter.schemas.enable: "true"
+        key.converter: "org.apache.kafka.connect.json.JsonConverter" # 추가
+        key.converter.schemas.enable: "false"
         batch.size: "1" # 이상 탐지는 즉시 확인해야하므로 1개씩 데이터 전송
     status_code: [201, 409]
   register: rds_anomaly_result

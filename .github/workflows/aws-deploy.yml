@@ -61,6 +61,7 @@ jobs:
           cp terraform.tfvars.example terraform.tfvars
           sed -i 's|^k3s_shared_token *=.*|k3s_shared_token = "${{ secrets.K3S_TOKEN }}"|' terraform.tfvars
 
+      # tfvars에 Secrets에 있는 RDS_PASSWORD 주입
       - name: Prepare data tfvars from example
         working-directory: ${{ github.workspace }}/infra/aws/terraform/data
         shell: bash
@@ -466,7 +467,13 @@ jobs:
               -o ProxyCommand='aws ssm start-session --target %h --document-name AWS-StartSSHSession --parameters portNumber=%p' \
               ubuntu@"${TARGET}" 'echo ssm-ssh-ok'
           done
-
-      - name: Run Ansible playbook
+      
+      - name: Run Ansible Playbook
         working-directory: infra/aws/ansible
-        run: ansible-playbook -i inventory/hosts.ini --vault-password-file vault/vault_pass playbooks/setup_k3s_cluster.yml
+        env:
+          DB_PASS: ${{ secrets.RDS_PASSWORD }}
+        run: |
+          ansible-playbook -i inventory/hosts.ini \
+            --vault-password-file vault/vault_pass \
+            -e "db_password=$DB_PASS" \
+            playbooks/setup_k3s_cluster.yml
