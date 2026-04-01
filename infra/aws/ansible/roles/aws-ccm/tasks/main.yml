@@ -36,18 +36,17 @@
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   run_once: true
 
+- name: AWS CCM values 파일 복사
+  copy:
+    src: aws-ccm-values.yaml
+    dest: /tmp/aws-ccm-values.yaml
+
 - name: AWS CCM 배포
   command: >
     helm upgrade --install aws-cloud-controller-manager
     aws-cloud-controller-manager/aws-cloud-controller-manager
     --namespace kube-system
-    --set args[0]=--v=2
-    --set args[1]=--cloud-provider=aws
-    --set args[2]=--cluster-name={{ cluster_name }}
-    --set clusterRoleRules[0].apiGroups[0]=""
-    --set nodeSelector.node-role\.kubernetes\.io/control-plane=""
-    --set tolerations[0].key=node-role.kubernetes.io/control-plane
-    --set tolerations[0].effect=NoSchedule
+    --values /tmp/aws-ccm-values.yaml
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   run_once: true
