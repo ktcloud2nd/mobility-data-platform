@@ -4,7 +4,7 @@ args:
   - --cluster-name=8team-cluster
 
 nodeSelector:
-  node-role.kubernetes.io/control-plane: ""
+  node-role.kubernetes.io/control-plane: "true"
 
 tolerations:
   - key: node-role.kubernetes.io/control-plane
