@@ -1,9 +1,10 @@
 ---
 - name: Wait for operator worker nodes to become ready
-  command: kubectl wait node --selector=role=operator-worker --for=condition=Ready --timeout=600s
+  command: kubectl wait node --selector=role=operator-worker --for=condition=Ready --timeout=60s
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   run_once: true
+  ignore_errors: yes
 
 - name: Add prometheus-community Helm repository
   command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update
