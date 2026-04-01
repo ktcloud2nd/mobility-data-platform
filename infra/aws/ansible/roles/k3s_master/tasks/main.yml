@@ -85,6 +85,7 @@
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
   run_once: true
+  ignore_errors: yes
 
 - name: CoreDNS HA 설정 (replica 2개, AZ 분산)
   shell: |
