@@ -193,6 +193,11 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install runner dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip jq curl
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -202,7 +207,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install ansible boto3 botocore
-          ~/.local/bin/ansible-galaxy collection install amazon.aws community.general
+          python -m ansible.cli.galaxy collection install amazon.aws community.general
 
       - name: Terraform Init
         run: terraform init
@@ -259,7 +264,7 @@ jobs:
             exit 1
           fi
 
-          ~/.local/bin/ansible-playbook -i azure_hosts.ini ../ansible/playbook.yml \
+          python -m ansible.cli.playbook -i azure_hosts.ini ../ansible/playbook.yml \
             -e "rds_endpoint=${RDS_ADDR}" \
             -e "aws_region=${{ vars.AWS_REGION }}" \
             -e "dockerhub_username=${{ secrets.DOCKERHUB_USERNAME }}" \
