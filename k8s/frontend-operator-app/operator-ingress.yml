@@ -13,7 +13,7 @@ spec:
   rules:
     - http:
         paths:
-          - path: /home
+          - path: /operator
             pathType: Prefix
             backend:
               service:
