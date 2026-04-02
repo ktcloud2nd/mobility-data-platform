@@ -10,6 +10,7 @@ import {
   validateQuickSightConfig
 } from './quicksight.js';
 import { getGrafanaEmbedPayload } from './grafana.js';
+import { loadUserDashboard } from './userDashboard.js';
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -281,6 +282,37 @@ if (isEnabledForTarget('operator')) {
   app.get('/api/quicksight/vehicle-embeds/status', (_request, response) => {
     const validation = validateQuickSightConfig('vehicle');
     response.json(validation);
+  });
+}
+
+if (isEnabledForTarget('user')) {
+  app.get('/api/user/dashboard', async (request, response) => {
+    const userId = String(request.query.userId || '').trim();
+
+    if (!userId) {
+      response.status(400).json({
+        message: 'userId query parameter is required.'
+      });
+      return;
+    }
+
+    try {
+      const dashboard = await loadUserDashboard(userId);
+
+      if (!dashboard) {
+        response.status(404).json({
+          message: 'User dashboard data could not be found.'
+        });
+        return;
+      }
+
+      response.json(dashboard);
+    } catch (error) {
+      response.status(500).json({
+        message: 'User dashboard could not be loaded.',
+        details: error.message
+      });
+    }
   });
 }
 
