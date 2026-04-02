@@ -1,3 +1,4 @@
+-- 차량 모델 코드(이미지) 테이블
 CREATE TABLE IF NOT EXISTS model_codes (
     code INT PRIMARY KEY,
     model_name VARCHAR(50) NOT NULL,
@@ -11,6 +12,7 @@ INSERT INTO model_codes (code, model_name, image_url) VALUES
 (4, 'Tucson', '/models/tucson.png')
 ON CONFLICT (code) DO NOTHING;
 
+-- 사용자/운영자 계정 테이블
 CREATE TABLE IF NOT EXISTS accounts (
     id SERIAL PRIMARY KEY,
     user_id VARCHAR(50) NOT NULL UNIQUE,
@@ -20,12 +22,14 @@ CREATE TABLE IF NOT EXISTS accounts (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 차량 기본 정보 테이블
 CREATE TABLE IF NOT EXISTS vehicle_master (
     id SERIAL PRIMARY KEY,
     vehicle_id VARCHAR(50) NOT NULL UNIQUE,
     model_code INT REFERENCES model_codes(code)
 );
 
+-- 사용자와 차량 id 매핑 테이블
 CREATE TABLE IF NOT EXISTS user_vehicle_mapping (
     id SERIAL PRIMARY KEY,
     account_id INT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
@@ -49,30 +53,19 @@ INSERT INTO vehicle_master (vehicle_id, model_code) VALUES
 ON CONFLICT (vehicle_id) DO NOTHING;
 
 INSERT INTO user_vehicle_mapping (account_id, vehicle_id)
-SELECT a.id, 'car_1'
+SELECT a.id, v.vehicle_id
 FROM accounts a
-WHERE a.user_id = 'user01'
+JOIN (
+    VALUES
+        ('user01', 'car_1'),
+        ('user02', 'car_2'),
+        ('user03', 'car_3'),
+        ('user04', 'car_4')
+) AS v(user_id, vehicle_id)
+ON a.user_id = v.user_id
 ON CONFLICT DO NOTHING;
 
-INSERT INTO user_vehicle_mapping (account_id, vehicle_id)
-SELECT a.id, 'car_2'
-FROM accounts a
-WHERE a.user_id = 'user02'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO user_vehicle_mapping (account_id, vehicle_id)
-SELECT a.id, 'car_3'
-FROM accounts a
-WHERE a.user_id = 'user03'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO user_vehicle_mapping (account_id, vehicle_id)
-SELECT a.id, 'car_4'
-FROM accounts a
-WHERE a.user_id = 'user04'
-ON CONFLICT DO NOTHING;
-
--- 정제 데이터 테이블 (기존과 동일, 호환 완료)
+-- 정제 데이터 테이블
 CREATE TABLE IF NOT EXISTS vehicle_stats (
     id SERIAL PRIMARY KEY,
     vehicle_id VARCHAR(50) NOT NULL,
@@ -88,7 +81,7 @@ CREATE TABLE IF NOT EXISTS vehicle_stats (
 
 CREATE INDEX IF NOT EXISTS idx_vehicle_timestamp ON vehicle_stats(vehicle_id, timestamp DESC);
 
--- 이상 탐지 알람 테이블 (프로세서 코드의 'evidence' 필드와 호환되도록 수정)
+-- 이상 탐지 알람 테이블
 CREATE TABLE IF NOT EXISTS vehicle_anomaly_alerts (
     id SERIAL PRIMARY KEY,
     alert_time BIGINT NOT NULL,       -- 서버 감지 시각 (alert_time)
