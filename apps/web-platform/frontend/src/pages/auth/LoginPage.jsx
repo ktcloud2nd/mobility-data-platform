@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchModelCodes, login, signup } from '../../api/auth';
 import { getDefaultPathForRole, isExternalUrl } from '../../config/appTarget';
@@ -27,7 +27,7 @@ function LoginPage({ allowedRole = null }) {
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
+  useState(() => {
     fetchModelCodes()
       .then((models) =>
         setModelCodes(models.filter((model) => Number(model.code) >= 1))
@@ -68,8 +68,8 @@ function LoginPage({ allowedRole = null }) {
       if (allowedRole && result.role !== allowedRole) {
         setErrorMessage(
           allowedRole === 'operator'
-            ? '운영자 계정으로 로그인해야 합니다.'
-            : '사용자 계정으로 로그인해야 합니다.'
+            ? 'Please sign in with an operator account.'
+            : 'Please sign in with a user account.'
         );
         return;
       }

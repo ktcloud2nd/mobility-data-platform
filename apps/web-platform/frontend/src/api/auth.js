@@ -12,7 +12,7 @@ async function request(path, options = {}) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.message || '요청을 처리하지 못했습니다.');
+    throw new Error(data.message || 'The request could not be completed.');
   }
 
   return data;
