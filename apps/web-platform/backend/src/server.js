@@ -19,6 +19,7 @@ const allowedOrigins =
     .map((origin) => origin.trim())
     .filter(Boolean) || [
     'http://localhost:5173',
+    'http://localhost:5174',
     'http://localhost:8080',
     'http://localhost:8081',
     'http://localhost:8082'
@@ -110,31 +111,12 @@ if (isEnabledForTarget('login')) {
       return;
     }
 
-    if (vehicleId) {
-      const duplicateVehicle = await query(
-        'SELECT id FROM vehicle_master WHERE vehicle_id = $1',
-        [vehicleId]
-      );
-
-      if (duplicateVehicle.rowCount > 0) {
-        response.status(409).json({
-          code: 'DUPLICATE_VEHICLE_ID',
-          message: 'That vehicleId is already in use.'
-        });
-        return;
-      }
-    }
-
-    const result = await query(
-      `
-        SELECT id
-        FROM vehicle_master
-        WHERE vehicle_id = $1
-      `,
+    const duplicateVehicle = await query(
+      'SELECT id FROM vehicle_master WHERE vehicle_id = $1',
       [vehicleId]
     );
 
-    if (result.rowCount > 0) {
+    if (duplicateVehicle.rowCount > 0) {
       response.status(409).json({
         code: 'DUPLICATE_VEHICLE_ID',
         message: 'That vehicleId is already in use.'
@@ -214,7 +196,9 @@ if (isEnabledForTarget('login')) {
           v.vehicle_id AS "vehicleId",
           v.model_code AS "modelCode"
         FROM accounts a
-        LEFT JOIN user_vehicle_mapping uvm ON uvm.account_id = a.id
+        LEFT JOIN user_vehicle_mapping uvm
+          ON uvm.account_id = a.id
+          AND a.role = 'user'
         LEFT JOIN vehicle_master v ON v.vehicle_id = uvm.vehicle_id
         WHERE a.user_id = $1 AND a.password_hash = $2
       `,

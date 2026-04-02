@@ -7,6 +7,14 @@ const defaultModelCodes = [
   { code: 4, modelName: 'Tucson', imageUrl: '/models/tucson.png' }
 ];
 
+const defaultAccounts = [
+  { userId: 'user01', password: 'pass01!', role: 'user', userName: '°­µ¿ÈÆ', vehicleId: 'car_1', modelCode: 1 },
+  { userId: 'user02', password: 'pass02!', role: 'user', userName: 'ÀÌÁ¤¼ö', vehicleId: 'car_2', modelCode: 2 },
+  { userId: 'user03', password: 'pass03!', role: 'user', userName: '¹Ú¼­Çö', vehicleId: 'car_3', modelCode: 3 },
+  { userId: 'user04', password: 'pass04!', role: 'user', userName: 'ÃÖÀ±Áö', vehicleId: 'car_4', modelCode: 4 },
+  { userId: 'admin01', password: 'admin01!', role: 'operator', userName: 'ÃÖ¹Î¼ö', vehicleId: null, modelCode: null }
+];
+
 export async function initSchema() {
   await query(`
     CREATE TABLE IF NOT EXISTS model_codes (
@@ -60,6 +68,104 @@ export async function initSchema() {
     ON vehicle_anomaly_alerts (occurred_at DESC);
   `);
 
+  await query(`
+    INSERT INTO accounts (user_id, password_hash, role, user_name)
+    SELECT user_id, password_hash, 'user', user_name
+    FROM user_accounts
+    ON CONFLICT (user_id) DO NOTHING;
+  `).catch(() => {});
+
+  await query(`
+    INSERT INTO accounts (user_id, password_hash, role, user_name)
+    SELECT user_id, password_hash, 'operator', user_name
+    FROM operator_accounts
+    ON CONFLICT (user_id) DO NOTHING;
+  `).catch(() => {});
+
+  await query(`
+    ALTER TABLE user_vehicle_mapping
+    ADD COLUMN IF NOT EXISTS account_id INT;
+  `);
+
+  await query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'user_vehicle_mapping'
+          AND column_name = 'user_account_id'
+      ) THEN
+        UPDATE user_vehicle_mapping uvm
+        SET account_id = a.id
+        FROM user_accounts ua
+        JOIN accounts a ON a.user_id = ua.user_id
+        WHERE uvm.user_account_id = ua.id
+          AND uvm.account_id IS NULL;
+      END IF;
+    END $$;
+  `);
+
+  await query(`
+    DELETE FROM user_vehicle_mapping uvm
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM accounts a
+      WHERE a.id = uvm.account_id
+    );
+  `);
+
+  await query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'user_vehicle_mapping'
+          AND column_name = 'user_account_id'
+      ) THEN
+        ALTER TABLE user_vehicle_mapping DROP CONSTRAINT IF EXISTS user_vehicle_mapping_user_account_id_fkey;
+        ALTER TABLE user_vehicle_mapping DROP COLUMN user_account_id;
+      END IF;
+    END $$;
+  `);
+
+  await query(`
+    ALTER TABLE user_vehicle_mapping
+    ALTER COLUMN account_id SET NOT NULL;
+  `);
+
+  await query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'user_vehicle_mapping_account_id_fkey'
+      ) THEN
+        ALTER TABLE user_vehicle_mapping
+        ADD CONSTRAINT user_vehicle_mapping_account_id_fkey
+        FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE;
+      END IF;
+    END $$;
+  `);
+
+  await query(`
+    ALTER TABLE user_vehicle_mapping
+    DROP CONSTRAINT IF EXISTS user_vehicle_mapping_user_account_id_vehicle_id_key;
+  `);
+
+  await query(`
+    ALTER TABLE user_vehicle_mapping
+    DROP CONSTRAINT IF EXISTS user_vehicle_mapping_account_id_vehicle_id_key;
+  `);
+
+  await query(`
+    ALTER TABLE user_vehicle_mapping
+    ADD CONSTRAINT user_vehicle_mapping_account_id_vehicle_id_key
+    UNIQUE (account_id, vehicle_id);
+  `);
+
   for (const model of defaultModelCodes) {
     await query(
       `
@@ -72,4 +178,41 @@ export async function initSchema() {
       [model.code, model.modelName, model.imageUrl]
     );
   }
+
+  for (const account of defaultAccounts) {
+    await query(
+      `
+        INSERT INTO accounts (user_id, password_hash, role, user_name)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (user_id) DO NOTHING;
+      `,
+      [account.userId, account.password, account.role, account.userName]
+    );
+
+    if (account.role !== 'user') {
+      continue;
+    }
+
+    await query(
+      `
+        INSERT INTO vehicle_master (vehicle_id, model_code)
+        VALUES ($1, $2)
+        ON CONFLICT (vehicle_id) DO NOTHING;
+      `,
+      [account.vehicleId, account.modelCode]
+    );
+
+    await query(
+      `
+        INSERT INTO user_vehicle_mapping (account_id, vehicle_id)
+        SELECT id, $2
+        FROM accounts
+        WHERE user_id = $1
+        ON CONFLICT DO NOTHING;
+      `,
+      [account.userId, account.vehicleId]
+    );
+  }
 }
+
+
