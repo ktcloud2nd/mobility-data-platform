@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
-import { query } from './db.js';
+import { query, withTransaction } from './db.js';
 import { initSchema } from './initSchema.js';
 import {
   getAnomalyEmbedUrls,
@@ -90,8 +90,15 @@ if (isEnabledForTarget('login')) {
       return;
     }
 
+    if (!vehicleId) {
+      response.status(400).json({
+        message: 'vehicleId is required.'
+      });
+      return;
+    }
+
     const duplicateUser = await query(
-      'SELECT id FROM vehicle_master WHERE user_id = $1',
+      'SELECT id FROM accounts WHERE user_id = $1',
       [userId]
     );
 
@@ -120,16 +127,70 @@ if (isEnabledForTarget('login')) {
 
     const result = await query(
       `
-        INSERT INTO vehicle_master (user_id, password, user_name, vehicle_id, model_code)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, user_id AS "userId", user_name AS "userName", vehicle_id AS "vehicleId", model_code AS "modelCode";
+        SELECT id
+        FROM vehicle_master
+        WHERE vehicle_id = $1
       `,
-      [userId, password, userName, vehicleId || null, numericModelCode]
+      [vehicleId]
     );
+
+    if (result.rowCount > 0) {
+      response.status(409).json({
+        code: 'DUPLICATE_VEHICLE_ID',
+        message: 'That vehicleId is already in use.'
+      });
+      return;
+    }
+
+    const createdUser = await withTransaction(async (client) => {
+      const accountResult = await client.query(
+        `
+          INSERT INTO accounts (user_id, password_hash, role, user_name)
+          VALUES ($1, $2, 'user', $3)
+          RETURNING id, user_id AS "userId", user_name AS "userName", role;
+        `,
+        [userId, password, userName]
+      );
+
+      await client.query(
+        `
+          INSERT INTO vehicle_master (vehicle_id, model_code)
+          VALUES ($1, $2)
+        `,
+        [vehicleId, numericModelCode]
+      );
+
+      await client.query(
+        `
+          INSERT INTO user_vehicle_mapping (account_id, vehicle_id)
+          VALUES ($1, $2)
+        `,
+        [accountResult.rows[0].id, vehicleId]
+      );
+
+      const userResult = await client.query(
+        `
+          SELECT
+            a.id,
+            a.user_id AS "userId",
+            a.user_name AS "userName",
+            a.role,
+            v.vehicle_id AS "vehicleId",
+            v.model_code AS "modelCode"
+          FROM accounts a
+          LEFT JOIN user_vehicle_mapping uvm ON uvm.account_id = a.id
+          LEFT JOIN vehicle_master v ON v.vehicle_id = uvm.vehicle_id
+          WHERE a.id = $1
+        `,
+        [accountResult.rows[0].id]
+      );
+
+      return userResult.rows[0];
+    });
 
     response.status(201).json({
       message: 'Sign up completed successfully.',
-      user: result.rows[0]
+      user: createdUser
     });
   });
 
@@ -145,9 +206,17 @@ if (isEnabledForTarget('login')) {
 
     const result = await query(
       `
-        SELECT id, user_id AS "userId", user_name AS "userName", vehicle_id AS "vehicleId", model_code AS "modelCode"
-        FROM vehicle_master
-        WHERE user_id = $1 AND password = $2
+        SELECT
+          a.id,
+          a.user_id AS "userId",
+          a.user_name AS "userName",
+          a.role,
+          v.vehicle_id AS "vehicleId",
+          v.model_code AS "modelCode"
+        FROM accounts a
+        LEFT JOIN user_vehicle_mapping uvm ON uvm.account_id = a.id
+        LEFT JOIN vehicle_master v ON v.vehicle_id = uvm.vehicle_id
+        WHERE a.user_id = $1 AND a.password_hash = $2
       `,
       [userId, password]
     );
@@ -160,7 +229,7 @@ if (isEnabledForTarget('login')) {
     }
 
     response.json({
-      role: result.rows[0].modelCode === 0 ? 'operator' : 'user',
+      role: result.rows[0].role,
       user: result.rows[0]
     });
   });

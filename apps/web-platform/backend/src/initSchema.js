@@ -1,10 +1,10 @@
 import { query } from './db.js';
 
 const defaultModelCodes = [
-  { code: 1, modelName: 'Model 1', imageUrl: '' },
-  { code: 2, modelName: 'Model 2', imageUrl: '' },
-  { code: 3, modelName: 'Model 3', imageUrl: '' },
-  { code: 4, modelName: 'Model 4', imageUrl: '' }
+  { code: 1, modelName: 'Avante', imageUrl: '/models/avante.png' },
+  { code: 2, modelName: 'Grandeur', imageUrl: '/models/grandeur.png' },
+  { code: 3, modelName: 'Santafe', imageUrl: '/models/santafe.png' },
+  { code: 4, modelName: 'Tucson', imageUrl: '/models/tucson.png' }
 ];
 
 export async function initSchema() {
@@ -17,29 +17,31 @@ export async function initSchema() {
   `);
 
   await query(`
-    CREATE TABLE IF NOT EXISTS vehicle_master (
+    CREATE TABLE IF NOT EXISTS accounts (
       id SERIAL PRIMARY KEY,
       user_id VARCHAR(50) NOT NULL UNIQUE,
-      password VARCHAR(255) NOT NULL,
+      password_hash VARCHAR(255) NOT NULL,
+      role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'operator')),
       user_name VARCHAR(100),
-      vehicle_id VARCHAR(50) UNIQUE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS vehicle_master (
+      id SERIAL PRIMARY KEY,
+      vehicle_id VARCHAR(50) NOT NULL UNIQUE,
       model_code INT REFERENCES model_codes(code)
     );
   `);
 
   await query(`
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conname = 'vehicle_master_vehicle_id_key'
-      ) THEN
-        ALTER TABLE vehicle_master
-        ADD CONSTRAINT vehicle_master_vehicle_id_key UNIQUE (vehicle_id);
-      END IF;
-    END
-    $$;
+    CREATE TABLE IF NOT EXISTS user_vehicle_mapping (
+      id SERIAL PRIMARY KEY,
+      account_id INT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+      vehicle_id VARCHAR(50) NOT NULL REFERENCES vehicle_master(vehicle_id) ON DELETE CASCADE,
+      UNIQUE (account_id, vehicle_id)
+    );
   `);
 
   await query(`
