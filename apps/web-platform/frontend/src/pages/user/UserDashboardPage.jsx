@@ -158,7 +158,7 @@ function UserDashboardPage() {
       }
 
       try {
-        const response = await fetchUserDashboard(userId);
+        const response = await fetchUserDashboard();
 
         if (cancelled) {
           return;

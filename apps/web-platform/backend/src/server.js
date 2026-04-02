@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
+import crypto from 'crypto';
 import { query, withTransaction } from './db.js';
 import { initSchema } from './initSchema.js';
 import {
@@ -28,6 +29,97 @@ const allowedOrigins =
 
 function isEnabledForTarget(...targets) {
   return appTarget === 'all' || targets.includes(appTarget);
+}
+
+function encodeTokenPart(value) {
+  return Buffer.from(value).toString('base64url');
+}
+
+function decodeTokenPart(value) {
+  return Buffer.from(value, 'base64url').toString('utf8');
+}
+
+function createSessionToken(account) {
+  const payload = {
+    userId: account.userId,
+    role: account.role,
+    issuedAt: Math.floor(Date.now() / 1000)
+  };
+  const encodedPayload = encodeTokenPart(JSON.stringify(payload));
+  const signature = crypto
+    .createHmac('sha256', String(account.passwordHash))
+    .update(encodedPayload)
+    .digest('base64url');
+
+  return `${encodedPayload}.${signature}`;
+}
+
+async function verifySessionToken(authorizationHeader) {
+  const bearerPrefix = 'Bearer ';
+  const headerValue = String(authorizationHeader || '');
+
+  if (!headerValue.startsWith(bearerPrefix)) {
+    return null;
+  }
+
+  const token = headerValue.slice(bearerPrefix.length).trim();
+  const [encodedPayload, providedSignature] = token.split('.');
+
+  if (!encodedPayload || !providedSignature) {
+    return null;
+  }
+
+  let payload;
+
+  try {
+    payload = JSON.parse(decodeTokenPart(encodedPayload));
+  } catch {
+    return null;
+  }
+
+  if (!payload?.userId || !payload?.role) {
+    return null;
+  }
+
+  const accountResult = await query(
+    `
+      SELECT
+        user_id AS "userId",
+        role,
+        password_hash AS "passwordHash"
+      FROM accounts
+      WHERE user_id = $1
+      LIMIT 1
+    `,
+    [payload.userId]
+  );
+
+  if (accountResult.rowCount === 0) {
+    return null;
+  }
+
+  const account = accountResult.rows[0];
+  const expectedSignature = crypto
+    .createHmac('sha256', String(account.passwordHash))
+    .update(encodedPayload)
+    .digest();
+  const actualSignature = Buffer.from(providedSignature, 'base64url');
+
+  if (
+    expectedSignature.length !== actualSignature.length ||
+    !crypto.timingSafeEqual(expectedSignature, actualSignature)
+  ) {
+    return null;
+  }
+
+  if (account.role !== payload.role) {
+    return null;
+  }
+
+  return {
+    userId: account.userId,
+    role: account.role
+  };
 }
 
 app.use(
@@ -130,7 +222,7 @@ if (isEnabledForTarget('login')) {
         `
           INSERT INTO accounts (user_id, password_hash, role, user_name)
           VALUES ($1, $2, 'user', $3)
-          RETURNING id, user_id AS "userId", user_name AS "userName", role;
+          RETURNING id, user_id AS "userId", user_name AS "userName", role, password_hash AS "passwordHash";
         `,
         [userId, password, userName]
       );
@@ -194,6 +286,7 @@ if (isEnabledForTarget('login')) {
           a.user_id AS "userId",
           a.user_name AS "userName",
           a.role,
+          a.password_hash AS "passwordHash",
           v.vehicle_id AS "vehicleId",
           v.model_code AS "modelCode"
         FROM accounts a
@@ -215,7 +308,11 @@ if (isEnabledForTarget('login')) {
 
     response.json({
       role: result.rows[0].role,
-      user: result.rows[0]
+      token: createSessionToken(result.rows[0]),
+      user: {
+        ...result.rows[0],
+        passwordHash: undefined
+      }
     });
   });
 }
@@ -287,33 +384,17 @@ if (isEnabledForTarget('operator')) {
 
 if (isEnabledForTarget('user')) {
   app.get('/api/user/dashboard', async (request, response) => {
-    const userId = String(request.query.userId || '').trim();
-    const sessionUserId = String(request.header('x-user-id') || '').trim();
-    const sessionRole = String(request.header('x-user-role') || '').trim().toLowerCase();
+    const session = await verifySessionToken(request.header('authorization'));
 
-    if (!userId) {
-      response.status(400).json({
-        message: 'userId query parameter is required.'
-      });
-      return;
-    }
-
-    if (!sessionUserId || sessionRole !== 'user') {
+    if (!session || session.role !== 'user') {
       response.status(401).json({
-        message: 'Authenticated user context is required.'
-      });
-      return;
-    }
-
-    if (sessionUserId !== userId) {
-      response.status(403).json({
-        message: 'You are not allowed to access another user dashboard.'
+        message: 'A valid authenticated user session is required.'
       });
       return;
     }
 
     try {
-      const dashboard = await loadUserDashboard(userId);
+      const dashboard = await loadUserDashboard(session.userId);
 
       if (!dashboard) {
         response.status(404).json({

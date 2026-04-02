@@ -2,14 +2,15 @@ import { getStoredSession } from '../utils/authStorage';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
-export async function fetchUserDashboard(userId) {
+export async function fetchUserDashboard() {
   const session = getStoredSession();
   const response = await fetch(
-    `${API_BASE_URL}/user/dashboard?userId=${encodeURIComponent(userId)}`,
+    `${API_BASE_URL}/user/dashboard`,
     {
       headers: {
-        'x-user-id': String(session?.user?.userId || ''),
-        'x-user-role': String(session?.role || '')
+        ...(session?.token
+          ? { Authorization: `Bearer ${session.token}` }
+          : {})
       }
     }
   );

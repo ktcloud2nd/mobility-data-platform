@@ -154,6 +154,7 @@ export async function loadUserDashboard(userId) {
       JOIN vehicle_master vm ON vm.vehicle_id = uvm.vehicle_id
       LEFT JOIN model_codes mc ON mc.code = vm.model_code
       WHERE a.user_id = $1
+      ORDER BY vm.vehicle_id ASC
       LIMIT 1
     `,
     [userId]
