@@ -31,7 +31,8 @@ spec:
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: backend-user
-          image: wooyeol43/user-backend:latest
+          image: kimsewon/user-backend:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 4000
           envFrom:

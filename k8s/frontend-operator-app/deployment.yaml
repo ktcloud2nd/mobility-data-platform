@@ -22,7 +22,8 @@ spec:
         role: operator-worker
       containers:
         - name: operator-app
-          image: wooyeol43/operator-frontend:latest
+          image: kimsewon/operator-frontend:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
           resources:

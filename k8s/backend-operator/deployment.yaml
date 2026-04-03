@@ -31,7 +31,8 @@ spec:
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: backend-operator
-          image: wooyeol43/operator-backend:latest
+          image: kimsewon/operator-backend:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 4000
           envFrom:

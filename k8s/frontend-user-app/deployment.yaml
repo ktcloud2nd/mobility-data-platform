@@ -31,7 +31,8 @@ spec:
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: user-app
-          image: wooyeol43/user-frontend:latest
+          image: kimsewon/user-frontend:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
           resources:
