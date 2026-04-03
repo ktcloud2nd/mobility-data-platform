@@ -5,20 +5,18 @@
   become: yes
   vars_files:
     - ../vault/vault.yml
+    - ../roles/db_setup/vars/main.yml
   vars:
     db_password: "{{ lookup('aws_ssm', '/config/vehicle/db_password', decrypt=True, region='ap-northeast-2') }}"
   roles:
-    - role: k3s_master
-      vars:
-        db_endpoint: "{{ db_endpoint | default('db.vehicle.internal', true) }}"
-        db_username: "{{ db_username | default('dbadmin', true) }}"
-        db_name: "{{ db_name | default('vehicle_db', true) }}"
-        db_port: "{{ db_port | default(5432, true) | int }}"
+    - k3s_master
 
 - name: Initialize database schema from master node
   hosts: masters[0]
   become: yes
   gather_facts: yes
+  vars_files:
+    - ../roles/db_setup/vars/main.yml
   vars:
     db_password: "{{ lookup('aws_ssm', '/config/vehicle/db_password', decrypt=True, region='ap-northeast-2') }}"
   tasks:
@@ -34,10 +32,6 @@
       vars:
         ansible_python_interpreter: /usr/bin/python3
         db_password: "{{ db_password }}"
-        db_endpoint: "{{ db_endpoint | default('db.vehicle.internal', true) }}"
-        db_username: "{{ db_username | default('dbadmin', true) }}"
-        db_name: "{{ db_name | default('vehicle_db', true) }}"
-        db_port: "{{ db_port | default(5432, true) | int }}"
 
 - name: Install Linkerd
   hosts: masters
@@ -69,15 +63,12 @@
 - name: Provision web-platform backend env and secrets
   hosts: masters
   become: yes
+  vars_files:
+    - ../roles/db_setup/vars/main.yml
   vars:
     db_password: "{{ lookup('aws_ssm', '/config/vehicle/db_password', decrypt=True, region='ap-northeast-2') }}"
   roles:
-    - role: web_platform_env
-      vars:
-        db_endpoint: "{{ db_endpoint | default('db.vehicle.internal', true) }}"
-        db_username: "{{ db_username | default('dbadmin', true) }}"
-        db_name: "{{ db_name | default('vehicle_db', true) }}"
-        db_port: "{{ db_port | default(5432, true) | int }}"
+    - web_platform_env
 
 - name: Install ArgoCD applications
   hosts: masters
