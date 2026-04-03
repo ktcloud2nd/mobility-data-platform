@@ -90,7 +90,7 @@
         targetRevision: main
         path: k8s/frontend-operator-app
         directory:
-          exclude: '*-secret.yml'
+          exclude: '{*-secret.yml,*.example.yaml}'
       destination:
         server: https://kubernetes.default.svc
         namespace: operator-app
@@ -120,7 +120,7 @@
         targetRevision: main
         path: k8s/frontend-user-app
         directory:
-          exclude: '*-secret.yml'
+          exclude: '{*-secret.yml,*.example.yaml}'
       destination:
         server: https://kubernetes.default.svc
         namespace: user-app
@@ -150,7 +150,7 @@
         targetRevision: main
         path: k8s/backend-login
         directory:
-          exclude: '*-secret.yml'
+          exclude: '{*-secret.yml,*.example.yaml}'
       destination:
         server: https://kubernetes.default.svc
         namespace: login
@@ -180,7 +180,7 @@
         targetRevision: main
         path: k8s/backend-user
         directory:
-          exclude: '*-secret.yml'
+          exclude: '{*-secret.yml,*.example.yaml}'
       destination:
         server: https://kubernetes.default.svc
         namespace: user-app
@@ -210,7 +210,7 @@
         targetRevision: main
         path: k8s/backend-operator
         directory:
-          exclude: '*-secret.yml'
+          exclude: '{*-secret.yml,*.example.yaml}'
       destination:
         server: https://kubernetes.default.svc
         namespace: operator-app
