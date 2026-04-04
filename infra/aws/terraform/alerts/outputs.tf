@@ -13,7 +13,8 @@ output "lambda_security_group_id" {
   value       = aws_security_group.lambda.id
 }
 
-output "event_rule_name" {
-  description = "EventBridge rule that triggers the notifier Lambda."
-  value       = aws_cloudwatch_event_rule.schedule.name
+# Azure가 호출할 Lambda URL
+output "lambda_function_url" {
+  description = "Public Function URL for the Slack anomaly notifier Lambda."
+  value       = aws_lambda_function_url.notifier.function_url
 }

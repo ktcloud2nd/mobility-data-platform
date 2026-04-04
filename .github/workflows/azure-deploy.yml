@@ -256,8 +256,13 @@ jobs:
             -backend-config="access_key=${{ secrets.AWS_ACCESS_KEY_ID }}" \
             -backend-config="secret_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
             -backend-config="region=${{ vars.AWS_REGION }}"
+          terraform -chdir=../../aws/terraform/alerts init -reconfigure \
+            -backend-config="access_key=${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            -backend-config="secret_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            -backend-config="region=${{ vars.AWS_REGION }}"
 
           RDS_ADDR=$(terraform -chdir=../../aws/terraform/data output -raw db_endpoint)
+          ALERT_WEBHOOK_URL=$(terraform -chdir=../../aws/terraform/alerts output -raw lambda_function_url)
 
           if [ ! -f "../ansible/roles/kafka-consumer/files/processor.py" ]; then
             echo "Error: processor.py missing in roles/kafka-consumer/files/"
@@ -270,6 +275,8 @@ jobs:
             -e "dockerhub_username=${{ secrets.DOCKERHUB_USERNAME }}" \
             -e "broker_public_ip=${BROKER_PUBLIC_IP}" \
             -e "broker_internal_ip=${BROKER_PRIV_IP}" \
+            -e "alert_webhook_url=${ALERT_WEBHOOK_URL}" \
+            -e "alert_webhook_token=${{ secrets.ANOMALY_WEBHOOK_TOKEN }}" \
             -e "azure_storage_account_name=${{ env.AZURE_STORAGE_NAME }}" \
             -e "azure_storage_primary_key=${{ env.AZURE_STORAGE_KEY }}" \
             -e "db_name=vehicle_db" \

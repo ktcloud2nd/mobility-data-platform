@@ -40,41 +40,6 @@ variable "network_state_secret_key" {
   sensitive   = true
 }
 
-variable "data_state_bucket" {
-  description = "S3 bucket that stores the data terraform state file."
-  type        = string
-  default     = "palja-terraform-backend"
-}
-
-variable "data_state_key" {
-  description = "S3 object key for the data terraform state file."
-  type        = string
-  default     = "aws/data/terraform.tfstate"
-}
-
-variable "data_state_region" {
-  description = "AWS region of the S3 bucket that stores the data terraform state file."
-  type        = string
-  default     = "ap-northeast-2"
-}
-
-variable "data_state_access_key" {
-  description = "Access key used to read the data terraform state."
-  type        = string
-  sensitive   = true
-}
-
-variable "data_state_secret_key" {
-  description = "Secret key used to read the data terraform state."
-  type        = string
-  sensitive   = true
-}
-
-variable "db_password" {
-  description = "Master password for the PostgreSQL instance."
-  type        = string
-  sensitive   = true
-}
 
 variable "slack_webhook_url" {
   description = "Slack incoming webhook URL used for anomaly notifications."
@@ -82,16 +47,10 @@ variable "slack_webhook_url" {
   sensitive   = true
 }
 
-variable "consumer_name" {
-  description = "Checkpoint consumer name stored in alert_delivery_state."
+variable "alert_webhook_token" {
+  description = "Shared secret token used by Azure to authenticate anomaly webhook requests."
   type        = string
-  default     = "slack_anomaly_notifier"
-}
-
-variable "schedule_expression" {
-  description = "EventBridge schedule expression for the notifier Lambda."
-  type        = string
-  default     = "rate(1 minute)"
+  sensitive   = true
 }
 
 variable "lambda_timeout_seconds" {
@@ -110,18 +69,6 @@ variable "log_retention_in_days" {
   description = "CloudWatch log retention in days."
   type        = number
   default     = 14
-}
-
-variable "db_ssl_enabled" {
-  description = "Whether the notifier Lambda should use SSL when connecting to PostgreSQL."
-  type        = bool
-  default     = true
-}
-
-variable "db_ssl_reject_unauthorized" {
-  description = "Whether the notifier Lambda should reject unauthorized PostgreSQL certificates."
-  type        = bool
-  default     = false
 }
 
 variable "tags" {

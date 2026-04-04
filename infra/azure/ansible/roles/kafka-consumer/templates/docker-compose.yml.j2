@@ -12,6 +12,9 @@ services:
     environment:
       # 9094(외부용) 대신 내부 통로인 9091 사용
       KAFKA_BROKER: "{{ broker_internal_ip }}:9091"
+      ALERT_WEBHOOK_URL: "{{ alert_webhook_url | default('', true) }}"
+      ALERT_WEBHOOK_TOKEN: "{{ alert_webhook_token | default('', true) }}"
+
  
   # Kafka Connect
   kafka-connect:

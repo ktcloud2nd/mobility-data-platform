@@ -5,21 +5,12 @@ network_state_bucket = "palja-terraform-backend"
 network_state_key = "aws/network/terraform.tfstate"
 network_state_region = "ap-northeast-2"
 
-data_state_bucket = "palja-terraform-backend"
-data_state_key = "aws/data/terraform.tfstate"
-data_state_region = "ap-northeast-2"
-
-db_password = "temp"
 slack_webhook_url = "https://hooks.slack.com/services/REPLACE/ME"
+alert_webhook_token = "REPLACE_ME"
 
-consumer_name = "slack_anomaly_notifier"
-schedule_expression = "rate(1 minute)"
 lambda_timeout_seconds = 60
 lambda_memory_size = 256
 log_retention_in_days = 14
-
-db_ssl_enabled = true
-db_ssl_reject_unauthorized = false
 
 tags = {
   Environment = "dev"

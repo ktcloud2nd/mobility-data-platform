@@ -3,12 +3,16 @@ import json
 import time
 import threading
 from kafka import KafkaConsumer, KafkaProducer
+import urllib.error
+import urllib.request
 
 # 환경변수 및 토픽 설정
 KAFKA_BROKER = os.environ.get('KAFKA_BROKER', 'localhost:9092')
 RAW_TOPIC = 'raw_topic'
 CLEANSED_TOPIC = 'cleansed_topic'
 ANOMALY_TOPIC = 'anomaly_topic'
+ALERT_WEBHOOK_URL = os.environ.get('ALERT_WEBHOOK_URL', '').strip()
+ALERT_WEBHOOK_TOKEN = os.environ.get('ALERT_WEBHOOK_TOKEN', '').strip()
 
 print(f"--- 통합 프로세서 가동 시작 (Broker: {KAFKA_BROKER}) ---")
 
@@ -39,18 +43,41 @@ consumer, producer = create_kafka_clients()
 # 차량별 이전 상태 저장용 메모리 (판단 근거)
 vehicle_states = {}
 
-# 이상 탐지 전송 함수 (수정: DB 저장을 위한 Schema 추가)
+# webhook POST
+def post_alert_webhook(alert_payload):
+    if not ALERT_WEBHOOK_URL or not ALERT_WEBHOOK_TOKEN:
+        return
+
+    request = urllib.request.Request(
+        ALERT_WEBHOOK_URL,
+        data=json.dumps(alert_payload).encode('utf-8'),
+        headers={
+            'Content-Type': 'application/json',
+            'x-alert-token': ALERT_WEBHOOK_TOKEN,
+        },
+        method='POST',
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            if response.status >= 400:
+                raise RuntimeError(f'Webhook failed with status {response.status}')
+        print(f"[실시간 알림 전송] {alert_payload['vehicle_id']}: {alert_payload['anomaly_type']}")
+    except (urllib.error.URLError, RuntimeError) as exc:
+        print(f"[실시간 알림 실패] {alert_payload['vehicle_id']}: {exc}")
+
+# 이상 탐지 전송 함수 (DB 저장을 위한 Schema 추가)
 def send_alert(vehicle_id, anomaly_type, description, evidence_value, timestamp):
     """ 이상 징후 발생 시 필요한 수치만 골라 별도 토픽으로 전송 (Schema 포함) """
     
     # DB에 들어갈 실제 데이터
     alert_payload = {
-        "alert_time": int(time.time()),   # 서버 감지 시각
-        "vehicle_id": str(vehicle_id),    # 대상 차량
+        "alert_time": int(time.time()),    # 서버 감지 시각
+        "vehicle_id": str(vehicle_id),     # 대상 차량
         "anomaly_type": str(anomaly_type), # 이상 종류
         "description": str(description),   # 상황 설명
-        "evidence": str(evidence_value),  # 핵심 증거 수치
-        "occurred_at": int(timestamp)     # 실제 발생 시각
+        "evidence": str(evidence_value),   # 핵심 증거 수치
+        "occurred_at": int(timestamp)      # 실제 발생 시각
     }
 
     # JDBC 커넥터용 Schema 래핑
@@ -76,7 +103,9 @@ def send_alert(vehicle_id, anomaly_type, description, evidence_value, timestamp)
     key_json = json.dumps(key_payload).encode('utf-8')
 
     producer.send(ANOMALY_TOPIC, key=key_json, value=alert_wrapped)
-    print(f"[알람 발송] {vehicle_id}: {anomaly_type} ({evidence_value})")
+    post_alert_webhook(alert_payload)
+    print(f'[알림 발송] {vehicle_id}: {anomaly_type} ({evidence_value})')
+
 
 # 백그라운드 스레드: 30초 미수신 감시 (로직 유지)
 def monitor_missing_data():

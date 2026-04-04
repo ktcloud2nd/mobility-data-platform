@@ -1,59 +1,124 @@
 /*
 [Lambda 코드]
-- PostgreSQL 접속
-- alert_delivery_state애서 마지막 id 조회
-- vehicle_anomaly_alerts에서 신규 row 조회
-- Slack 전송 후 마지막 id 갱신 
+前 RDS polling Lambda
+現 HTTP 요청 받는 Lambda
 */
 
-import pg from 'pg';
+const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL;
+const ALERT_WEBHOOK_TOKEN = process.env.ALERT_WEBHOOK_TOKEN;
 
-const { Pool } = pg;
-
-function isTruthy(value) {
-  return ['1', 'true', 'yes', 'on'].includes(String(value || '').toLowerCase());
-}
-
-function createSslConfig() {
-  if (!isTruthy(process.env.DB_SSL)) {
-    return undefined;
-  }
-
+function json(statusCode, body) {
   return {
-    rejectUnauthorized: !['false', '0', 'no', 'off'].includes(
-      String(process.env.DB_SSL_REJECT_UNAUTHORIZED || 'true').toLowerCase()
-    )
+    statusCode,
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(body)
   };
 }
 
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT || 5432),
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  ...(createSslConfig() ? { ssl: createSslConfig() } : {})
-});
+function getHeader(headers, name) {
+  const entries = Object.entries(headers || {});
+  const match = entries.find(([key]) => key.toLowerCase() === name.toLowerCase());
+  return match ? match[1] : undefined;
+}
 
-const CONSUMER_NAME = process.env.CONSUMER_NAME || 'slack_anomaly_notifier';
-const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL;
+function parseEventBody(event) {
+  if (!event?.body) {
+    return null;
+  }
 
-function formatMessage(alert) {
+  const rawBody = event.isBase64Encoded
+    ? Buffer.from(event.body, "base64").toString("utf8")
+    : event.body;
+
+  return JSON.parse(rawBody);
+}
+
+// 유닉스타임 KST 변환
+function formatOccurredAt(timestamp) {
+  if (!timestamp) return "-";
+
+  const date = new Date(
+    String(timestamp).length === 10 ? timestamp * 1000 : timestamp
+  );
+
+  return date.toLocaleString("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+}
+
+function formatSlackMessage(alert) {
   return {
-    text:
-      `[이상탐지 알림]\n` +
-      `차량: ${alert.vehicle_id}\n` +
-      `유형: ${alert.anomaly_type || '-'}\n` +
-      `설명: ${alert.description || '-'}\n` +
-      `근거: ${alert.evidence || '-'}\n` +
-      `발생시각: ${alert.occurred_at || '-'}`
+    text: `[이상 탐지 알림] 차량 ${alert.vehicle_id}, 유형 ${alert.anomaly_type || "-"}`,
+    blocks: [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: "🚨 이상 탐지 알림"
+        }
+      },
+      {
+        type: "section",
+        fields: [
+          {
+            type: "mrkdwn",
+            text: `*차량 ID*\n${alert.vehicle_id}`
+          },
+          {
+            type: "mrkdwn",
+            text: `*유형*\n${alert.anomaly_type || "-"}`
+          },
+          {
+            type: "mrkdwn",
+            text: `*발생 시각*\n${formatOccurredAt(alert.occurred_at)}`
+          },
+          {
+            type: "mrkdwn",
+            text: `*근거*\n${alert.evidence || "-"}`
+          }
+        ]
+      },
+      {
+        type: "divider"
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `*설명*\n${alert.description || "-"}`
+        }
+      },
+      {
+        type: "actions",
+        elements: [
+          {
+            type: "button",
+            text: {
+              type: "plain_text",
+              text: "대시보드에서 확인하기"
+            },
+            url: "http://admin.palja.click"
+          }
+        ]
+      }
+    ]
   };
 }
 
 async function sendSlackMessage(payload) {
   const response = await fetch(SLACK_WEBHOOK_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
     body: JSON.stringify(payload)
   });
 
@@ -63,83 +128,72 @@ async function sendSlackMessage(payload) {
   }
 }
 
-async function ensureConsumerState(client) {
-  await client.query(
-    `
-      INSERT INTO alert_delivery_state (consumer_name, last_sent_id)
-      VALUES ($1, 0)
-      ON CONFLICT (consumer_name) DO NOTHING
-    `,
-    [CONSUMER_NAME]
-  );
+function validateAlertPayload(alert) {
+  if (!alert || typeof alert !== "object") {
+    return "Alert payload is required.";
+  }
+
+  if (!alert.vehicle_id) {
+    return "vehicle_id is required.";
+  }
+
+  if (!alert.anomaly_type) {
+    return "anomaly_type is required.";
+  }
+
+  if (!alert.occurred_at) {
+    return "occurred_at is required.";
+  }
+
+  return null;
 }
 
-export const handler = async () => {
-  const client = await pool.connect();
-
+export const handler = async (event) => {
   try {
-    await client.query('BEGIN');
-    await ensureConsumerState(client);
-
-    const stateResult = await client.query(
-      `
-        SELECT last_sent_id
-        FROM alert_delivery_state
-        WHERE consumer_name = $1
-        FOR UPDATE
-      `,
-      [CONSUMER_NAME]
-    );
-
-    const lastSentId = stateResult.rows[0]?.last_sent_id ?? 0;
-
-    const alertResult = await client.query(
-      `
-        SELECT id, vehicle_id, anomaly_type, description, evidence, occurred_at, alert_time
-        FROM vehicle_anomaly_alerts
-        WHERE id > $1
-        ORDER BY id ASC
-        LIMIT 100
-      `,
-      [lastSentId]
-    );
-
-    const alerts = alertResult.rows;
-    await client.query('COMMIT');
-
-    if (alerts.length === 0) {
-      return { ok: true, message: 'No new alerts' };
+    if (!SLACK_WEBHOOK_URL || !ALERT_WEBHOOK_TOKEN) {
+      return json(500, {
+        message: "Lambda environment is not configured."
+      });
     }
 
-    for (const alert of alerts) {
-      await sendSlackMessage(formatMessage(alert));
+    const method = event?.requestContext?.http?.method || event?.httpMethod || "POST";
+
+    if (method !== "POST") {
+      return json(405, {
+        message: "Method not allowed."
+      });
     }
 
-    const maxId = alerts[alerts.length - 1].id;
+    const providedToken =
+      getHeader(event?.headers, "x-alert-token") ||
+      getHeader(event?.headers, "authorization")?.replace(/^Bearer\s+/i, "");
 
-    await client.query('BEGIN');
-    await ensureConsumerState(client);
-    await client.query(
-      `
-        INSERT INTO alert_delivery_state (consumer_name, last_sent_id, updated_at)
-        VALUES ($2, $1, CURRENT_TIMESTAMP)
-        ON CONFLICT (consumer_name) DO UPDATE
-        SET last_sent_id = EXCLUDED.last_sent_id,
-            updated_at = CURRENT_TIMESTAMP
-      `,
-      [maxId, CONSUMER_NAME]
-    );
+    if (providedToken !== ALERT_WEBHOOK_TOKEN) {
+      return json(401, {
+        message: "Unauthorized."
+      });
+    }
 
-    await client.query('COMMIT');
-    return { ok: true, sent: alerts.length, lastSentId: maxId };
+    const alert = parseEventBody(event);
+    const validationError = validateAlertPayload(alert);
+
+    if (validationError) {
+      return json(400, {
+        message: validationError
+      });
+    }
+
+    await sendSlackMessage(formatSlackMessage(alert));
+
+    return json(200, {
+      ok: true
+    });
   } catch (error) {
-    try {
-      await client.query('ROLLBACK');
-    } catch (_rollbackError) {
-      // Ignore rollback failures after the transaction has already been closed.
-    }
-    throw error;
-  } finally {
-    client.release();
+    console.error("Failed to process anomaly alert event.", error);
+
+    return json(500, {
+      message: "Failed to process anomaly alert event.",
+      details: error.message
+    });
   }
 };
