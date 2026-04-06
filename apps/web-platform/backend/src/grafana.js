@@ -2,7 +2,7 @@ function trimTrailingSlash(value = '') {
   return value.replace(/\/+$/, '');
 }
 
-function withGrafanaTheme(value = '', theme = 'dark') {
+function withGrafanaEmbedOptions(value = '', { theme = 'dark', kiosk = 'tv' } = {}) {
   if (!value) {
     return '';
   }
@@ -10,14 +10,32 @@ function withGrafanaTheme(value = '', theme = 'dark') {
   try {
     const url = new URL(value);
 
-    if (!url.searchParams.has('theme')) {
+    if (theme && !url.searchParams.has('theme')) {
       url.searchParams.set('theme', theme);
+    }
+
+    if (kiosk && !url.searchParams.has('kiosk')) {
+      url.searchParams.set('kiosk', kiosk);
     }
 
     return url.toString();
   } catch {
+    const params = [];
+
+    if (theme && !value.includes('theme=')) {
+      params.push(`theme=${theme}`);
+    }
+
+    if (kiosk && !value.includes('kiosk=')) {
+      params.push(`kiosk=${kiosk}`);
+    }
+
+    if (!params.length) {
+      return value;
+    }
+
     const separator = value.includes('?') ? '&' : '?';
-    return value.includes('theme=') ? value : `${value}${separator}theme=${theme}`;
+    return `${value}${separator}${params.join('&')}`;
   }
 }
 
@@ -55,7 +73,7 @@ export function getGrafanaConfig() {
   return {
     enabled,
     baseUrl,
-    embedUrl: withGrafanaTheme(embedUrl, 'dark'),
+    embedUrl: withGrafanaEmbedOptions(embedUrl, { theme: 'dark', kiosk: 'tv' }),
     provider,
     allowEmbed
   };
