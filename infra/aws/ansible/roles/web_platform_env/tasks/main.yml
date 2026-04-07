@@ -68,11 +68,6 @@
         else 'http'
       }}
     cors_allowed_origins_resolved: "{{ user_app_origin_resolved }},{{ operator_app_origin_resolved }}"
-    quicksight_allowed_domains_resolved: >-
-      {{
-        quicksight_allowed_domains
-        | default(operator_app_origin_resolved, true)
-      }}
     grafana_embed_url_resolved: >-
       {{
         grafana_embed_url
@@ -146,12 +141,6 @@
       GRAFANA_ALLOW_EMBED: "true"
       GRAFANA_PROVIDER: "self-hosted"
       AWS_REGION: "{{ aws_region | default('ap-northeast-2') }}"
-      QUICKSIGHT_AWS_ACCOUNT_ID: "{{ quicksight_aws_account_id | default('', true) }}"
-      QUICKSIGHT_NAMESPACE: "{{ quicksight_namespace | default('default', true) }}"
-      QUICKSIGHT_ALLOWED_DOMAINS: "{{ quicksight_allowed_domains_resolved }}"
-      QUICKSIGHT_SESSION_LIFETIME_MINUTES: "{{ quicksight_session_lifetime_minutes | default('60', true) }}"
-      QUICKSIGHT_ANOMALY_DASHBOARD_ID: "{{ quicksight_anomaly_dashboard_id | default('', true) }}"
-      QUICKSIGHT_VEHICLE_DASHBOARD_ID: "{{ quicksight_vehicle_dashboard_id | default('', true) }}"
     EOF
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
@@ -200,9 +189,6 @@
     type: Opaque
     stringData:
       DB_PASSWORD: "{{ db_password }}"
-      QUICKSIGHT_REGISTERED_USER_ARN: "{{ quicksight_registered_user_arn | default('', true) }}"
-      QUICKSIGHT_ANOMALY_REGISTERED_USER_ARN: "{{ quicksight_anomaly_registered_user_arn | default('', true) }}"
-      QUICKSIGHT_VEHICLE_REGISTERED_USER_ARN: "{{ quicksight_vehicle_registered_user_arn | default('', true) }}"
     EOF
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml

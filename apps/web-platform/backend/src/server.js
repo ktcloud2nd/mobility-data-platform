@@ -11,12 +11,6 @@ import {
 } from './authSecurity.js';
 import { query, withTransaction } from './db.js';
 import { initSchema } from './initSchema.js';
-import {
-  getAnomalyEmbedUrls,
-  getEmbedDefinitions,
-  getVehicleEmbedUrls,
-  validateQuickSightConfig
-} from './quicksight.js';
 import { getGrafanaEmbedPayload } from './grafana.js';
 import { loadAnomalyDashboard } from './anomalyDashboard.js';
 import { loadOperatorVehicleDashboard } from './operatorVehicleDashboard.js';
@@ -173,22 +167,6 @@ app.use(
   })
 );
 app.use(express.json());
-
-function handleQuickSightError(response, error, target) {
-  if (error.code === 'QUICKSIGHT_CONFIG_MISSING') {
-    response.status(503).json({
-      message: `QuickSight ${target} embedding configuration is incomplete.`,
-      missingFields: error.details,
-      panels: getEmbedDefinitions(target)
-    });
-    return;
-  }
-
-  response.status(500).json({
-    message: `Failed to generate QuickSight ${target} embed URLs.`,
-    details: error.message
-  });
-}
 
 function normalizeTimestamp(value) {
   if (!value) {
@@ -608,38 +586,6 @@ if (isEnabledForTarget('operator')) {
         details: error.message
       });
     }
-  });
-
-  app.get('/api/quicksight/anomaly-embeds', requireOperatorSession, async (_request, response) => {
-    try {
-      const embeds = await getAnomalyEmbedUrls();
-      response.json({
-        panels: embeds
-      });
-    } catch (error) {
-      handleQuickSightError(response, error, 'anomaly');
-    }
-  });
-
-  app.get('/api/quicksight/vehicle-embeds', requireOperatorSession, async (_request, response) => {
-    try {
-      const embeds = await getVehicleEmbedUrls();
-      response.json({
-        panels: embeds
-      });
-    } catch (error) {
-      handleQuickSightError(response, error, 'vehicle');
-    }
-  });
-
-  app.get('/api/quicksight/anomaly-embeds/status', requireOperatorSession, (_request, response) => {
-    const validation = validateQuickSightConfig('anomaly');
-    response.json(validation);
-  });
-
-  app.get('/api/quicksight/vehicle-embeds/status', requireOperatorSession, (_request, response) => {
-    const validation = validateQuickSightConfig('vehicle');
-    response.json(validation);
   });
 }
 
