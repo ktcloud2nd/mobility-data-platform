@@ -15,6 +15,3 @@ AWS 배포 워크플로는 `.github/workflows/aws-deploy.yml`을 사용합니다
       - Grafana ingress path: `/grafana`
     - `infra/aws/ansible/roles/prometheus/tasks/main.yml`
       - Grafana subpath serve 설정 적용
-
-- `QUICKSIGHT_*`
-  - 기본값으로 추론할 수 없고 실제 AWS QuickSight 리소스 값이 필요합니다.
