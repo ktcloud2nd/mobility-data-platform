@@ -9,7 +9,6 @@ Terraform baseline for the Infra 1 scope.
 - Internet Gateway
 - NAT Gateway
 - Route tables and associations
-- S3 Gateway VPC Endpoint
 - Core security groups
 - Internet-facing ALB baseline
 - Public Route53 alias records for the user/operator app domains
