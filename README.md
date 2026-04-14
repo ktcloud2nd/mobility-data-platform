@@ -1,7 +1,7 @@
-﻿# Hybrid Cloud Data Lake & Service Platform
+﻿# Real-Time Mobility Data Platform on Hybrid Cloud
 
 > ktcloud 클라우드 인프라 부트캠프 2차 프로젝트  
-> 하이브리드 클라우드 기반으로 차량 텔레메트리 데이터를 수집, 적재, 분석, 서비스까지 연결한 End-to-End 플랫폼
+> Hybrid Cloud 기반으로 차량 데이터를 **실시간 수집 · 스트리밍 · 분석 · 서비스하는 End-to-End 데이터 플랫폼**
 
 ## 프로젝트 한눈에 보기
 
