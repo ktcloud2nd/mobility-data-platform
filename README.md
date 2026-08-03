@@ -1,7 +1,14 @@
 ﻿# Real-Time Mobility Data Platform on Hybrid Cloud
 
-> ktcloud 클라우드 인프라 부트캠프 2차 프로젝트  
+> **kt cloud 심화 프로젝트**  
 > Hybrid Cloud 기반으로 차량 데이터를 실시간 수집 · 스트리밍 · 분석 · 서비스하는 End-to-End 데이터 플랫폼
+
+<p align="center">
+  <br>
+  <b> Demo Video </b><br>
+  <img width="130" src="https://github.com/user-attachments/assets/6e4a22ac-0bea-4777-9efd-f3cdbb369eee" /><br>
+  <br>
+</p>
 
 ## 프로젝트 한눈에 보기
 
